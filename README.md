@@ -6,7 +6,7 @@
 Pluggable search engine integration for Django — index management, document
 indexing, and search queries with swappable backends.
 
-Part of the [ICV-Django](https://github.com/nigelcopley/icv-django) ecosystem.
+Part of the [ICV-Django](https://github.com/nigelcopley/icv-oss) ecosystem.
 
 ---
 
@@ -90,7 +90,7 @@ python manage.py migrate icv_search
 
 Installing with the `icv-core` extra gives you `BaseModel` (UUID primary key
 plus `created_at` / `updated_at` timestamps) from
-[icv-core](https://github.com/nigelcopley/icv-django):
+[icv-core](https://github.com/nigelcopley/icv-oss):
 
 ```bash
 pip install "django-icv-search[icv-core]"
