@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "django-icv-search"
-version = "0.9.0"
+version = "0.10.0"
 description = "Pluggable search engine integration for Django — index management, document indexing, and search queries with swappable backends."
 readme = "README.md"
 license = "MIT"
