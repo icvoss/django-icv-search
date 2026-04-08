@@ -720,3 +720,172 @@ class TestSearchableMixinDisplayedFields:
 
         settings = get_model_search_settings(FakeModel)
         assert "displayedAttributes" not in settings
+
+
+# ===========================================================================
+# Cross-backend: multi_search param forwarding
+# ===========================================================================
+
+
+class TestMultiSearchParamForwarding:
+    """multi_search() forwards all params, not just a hardcoded whitelist."""
+
+    def test_forwards_highlight_fields(self, db):
+        from icv_search.services import multi_search
+
+        create_index("products")
+        index_documents(
+            "products",
+            [{"id": "1", "name": "Running Shoes"}],
+        )
+        results = multi_search(
+            [
+                {
+                    "index_name": "products",
+                    "query": "Running",
+                    "highlight_fields": ["name"],
+                }
+            ]
+        )
+        # DummyBackend generates formatted_hits when highlight_fields is provided
+        assert len(results) == 1
+
+    def test_forwards_filter_param(self, db):
+        from icv_search.services import multi_search
+
+        create_index("products")
+        index_documents(
+            "products",
+            [
+                {"id": "1", "name": "Shoes", "brand": "Nike"},
+                {"id": "2", "name": "Socks", "brand": "Adidas"},
+            ],
+        )
+        results = multi_search(
+            [
+                {
+                    "index_name": "products",
+                    "query": "",
+                    "filter": {"brand": "Nike"},
+                }
+            ]
+        )
+        assert len(results[0].hits) == 1
+        assert results[0].hits[0]["brand"] == "Nike"
+
+    def test_forwards_limit_and_offset(self, db):
+        from icv_search.services import multi_search
+
+        create_index("products")
+        index_documents(
+            "products",
+            [{"id": str(i), "name": f"Item {i}"} for i in range(10)],
+        )
+        results = multi_search(
+            [
+                {
+                    "index_name": "products",
+                    "query": "",
+                    "limit": 3,
+                    "offset": 2,
+                }
+            ]
+        )
+        assert len(results[0].hits) == 3
+
+
+# ===========================================================================
+# Cross-backend: attributes_to_retrieve snake_case
+# ===========================================================================
+
+
+class TestAttributesToRetrieveSnakeCase:
+    """Backends accept snake_case attributes_to_retrieve from SearchQuery."""
+
+    def test_dummy_backend_filters_fields_snake_case(self, db):
+        create_index("products")
+        index_documents(
+            "products",
+            [{"id": "1", "name": "Shoes", "brand": "Nike", "price": 120}],
+        )
+        from icv_search.services import search
+
+        result = search("products", "", attributes_to_retrieve=["name"])
+        # Only id and name should be returned
+        assert "name" in result.hits[0]
+        assert "id" in result.hits[0]
+        assert "brand" not in result.hits[0]
+        assert "price" not in result.hits[0]
+
+    def test_autocomplete_uses_snake_case(self, db):
+        create_index("products")
+        index_documents(
+            "products",
+            [{"id": "1", "name": "Shoes", "brand": "Nike"}],
+        )
+        from icv_search.services import autocomplete
+
+        result = autocomplete("products", "Shoes", fields=["name"])
+        assert "id" in result.hits[0]
+        assert "name" in result.hits[0]
+        assert "brand" not in result.hits[0]
+
+
+# ===========================================================================
+# Cross-backend: SearchQuery executes through DummyBackend
+# ===========================================================================
+
+
+class TestSearchQueryDummyExecution:
+    """SearchQuery builder methods execute correctly through DummyBackend."""
+
+    def test_geo_near_executes(self, db):
+        create_index("venues")
+        index_documents(
+            "venues",
+            [
+                {"id": "1", "name": "Pub", "_geo": {"lat": 51.5, "lng": -0.12}},
+                {"id": "2", "name": "Cafe", "_geo": {"lat": 52.0, "lng": 0.1}},
+            ],
+        )
+        result = SearchQuery("venues").text("").geo_near(lat=51.5, lng=-0.12, radius=10000).execute()
+        assert len(result.hits) >= 1
+
+    def test_facets_execute(self, db):
+        create_index("products")
+        index_documents(
+            "products",
+            [
+                {"id": "1", "name": "Shoes", "brand": "Nike"},
+                {"id": "2", "name": "Shirt", "brand": "Nike"},
+                {"id": "3", "name": "Socks", "brand": "Adidas"},
+            ],
+        )
+        result = SearchQuery("products").text("").facets("brand").execute()
+        assert "brand" in result.facet_distribution
+        assert result.facet_distribution["brand"]["Nike"] == 2
+
+    def test_chained_sort_and_limit(self, db):
+        create_index("products")
+        index_documents(
+            "products",
+            [
+                {"id": "1", "name": "A Shoes", "brand": "Nike", "price": 120},
+                {"id": "2", "name": "B Shirt", "brand": "Nike", "price": 80},
+                {"id": "3", "name": "C Socks", "brand": "Adidas", "price": 15},
+            ],
+        )
+        result = SearchQuery("products").text("").sort("-price").limit(2).execute()
+        assert len(result.hits) == 2
+        assert result.hits[0]["price"] == 120
+
+    def test_attributes_to_retrieve_via_query_builder(self, db):
+        create_index("products")
+        index_documents(
+            "products",
+            [{"id": "1", "name": "Shoes", "brand": "Nike", "price": 120}],
+        )
+        result = SearchQuery("products").text("").attributes_to_retrieve("name").execute()
+        assert "name" in result.hits[0]
+        assert "id" in result.hits[0]
+        assert "brand" not in result.hits[0]
