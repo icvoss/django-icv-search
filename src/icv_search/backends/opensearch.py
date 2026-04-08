@@ -524,7 +524,9 @@ class OpenSearchBackend(BaseSearchBackend):
             }
 
         # Source filtering.
-        attributes_to_retrieve: list[str] | None = params.pop("attributesToRetrieve", None)
+        attributes_to_retrieve: list[str] | None = params.pop(
+            "attributes_to_retrieve", params.pop("attributesToRetrieve", None)
+        )
         if attributes_to_retrieve:
             includes = list(attributes_to_retrieve)
             if "id" not in includes:

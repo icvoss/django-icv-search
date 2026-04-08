@@ -535,8 +535,11 @@ class PostgresBackend(BaseSearchBackend):
                 raise SearchBackendError(f"Highlight query failed for index '{uid}'.", original_exception=exc) from exc
 
         # --- attributesToRetrieve filter ------------------------------------
+        # Accept both camelCase (Meilisearch native) and snake_case (SearchQuery builder).
         # The primary key ("id") is always included regardless of the list.
-        attributes_to_retrieve: list[str] | None = params.get("attributesToRetrieve")
+        attributes_to_retrieve: list[str] | None = params.get(
+            "attributes_to_retrieve", params.get("attributesToRetrieve")
+        )
         if attributes_to_retrieve is not None:
             allowed = set(attributes_to_retrieve) | {"id"}
             hits = [{k: v for k, v in hit.items() if k in allowed} for hit in hits]

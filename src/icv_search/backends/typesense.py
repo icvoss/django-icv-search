@@ -454,7 +454,9 @@ class TypesenseBackend(BaseSearchBackend):
         post_tag: str = params.pop("highlight_post_tag", "</mark>")
 
         # Source filtering.
-        attributes_to_retrieve: list[str] | None = params.pop("attributesToRetrieve", None)
+        attributes_to_retrieve: list[str] | None = params.pop(
+            "attributes_to_retrieve", params.pop("attributesToRetrieve", None)
+        )
 
         # Ranking score.
         _show_ranking_score: bool = params.pop("show_ranking_score", False)

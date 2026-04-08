@@ -559,7 +559,9 @@ class VespaBackend(BaseSearchBackend):
         sort_param: Any = params.pop("sort", None)
         ranking: str = params.pop("ranking", "default")
         ranking_features: dict[str, Any] | None = params.pop("ranking.features", None)
-        attrs_to_retrieve: list[str] | None = params.pop("attributesToRetrieve", None)
+        attrs_to_retrieve: list[str] | None = params.pop(
+            "attributes_to_retrieve", params.pop("attributesToRetrieve", None)
+        )
         highlight: bool = params.pop("highlight", False)
         summary_class: str | None = params.pop("summary", None)
         facets: list[str] | None = params.pop("facets", None)

@@ -415,7 +415,9 @@ class SolrBackend(BaseSearchBackend):
             sort_str = translate_sort_to_solr(raw_sort)
 
         # Field list (fl). id is always included (BR-010).
-        attrs_to_retrieve: list[str] | None = params.pop("attributesToRetrieve", None)
+        attrs_to_retrieve: list[str] | None = params.pop(
+            "attributes_to_retrieve", params.pop("attributesToRetrieve", None)
+        )
         if attrs_to_retrieve is not None:
             fl_fields = set(attrs_to_retrieve) | {"id"}
             fl = ",".join(sorted(fl_fields))

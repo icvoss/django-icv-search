@@ -289,10 +289,10 @@ def autocomplete(
     effective_tenant_id = resolve_tenant_id(tenant_id)
     index = resolve_index(name_or_index, effective_tenant_id)
 
-    # Resolve attributesToRetrieve — always include 'id'.
+    # Resolve attributes_to_retrieve — always include 'id'.
     if fields is not None:
         attributes_to_retrieve = list(dict.fromkeys(["id", *fields]))
-        params["attributesToRetrieve"] = attributes_to_retrieve
+        params["attributes_to_retrieve"] = attributes_to_retrieve
 
     cache = _get_cache()
 
@@ -394,10 +394,11 @@ def multi_search(
             "uid": index.engine_uid,
             "query": query.get("query", ""),
         }
-        # Forward optional search params, excluding service-layer keys.
-        for key in ("filter", "sort", "limit", "offset", "facets", "highlight_fields"):
-            if key in query:
-                engine_query[key] = query[key]
+        # Forward all search params, excluding service-layer keys.
+        _SERVICE_KEYS = {"index_name", "query", "tenant_id", "uid"}
+        for key, value in query.items():
+            if key not in _SERVICE_KEYS:
+                engine_query[key] = value
 
         resolved.append(engine_query)
 
