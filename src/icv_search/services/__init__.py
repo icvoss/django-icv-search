@@ -37,6 +37,7 @@ from icv_search.services.documents import (
 )
 from icv_search.services.fallbacks import execute_fallback, get_fallback_for_query
 from icv_search.services.indexing import (
+    clear_sync_logs,
     compact_index,
     create_index,
     delete_index,
@@ -224,6 +225,7 @@ __all__ = [
     "clear_query_logs",
     "get_query_trend",
     "clear_query_aggregates",
+    "clear_sync_logs",
     # Click tracking
     "log_click",
     "get_click_through_rate",

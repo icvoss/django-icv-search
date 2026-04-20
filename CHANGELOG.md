@@ -4,6 +4,16 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-04-20
+
+### Added
+
+- `clear_sync_logs(days_older_than=90)` service function to purge old
+  `IndexSyncLog` entries beyond the retention period.
+- `cleanup_sync_logs` Celery task for periodic log cleanup via beat.
+- `icv_search_cleanup_sync_logs` management command with `--days` and
+  `--dry-run` options.
+
 ## [1.0.0] - 2026-04-16
 
 First stable release. Promotes 1.0.0b1 to GA with fixes and expanded test

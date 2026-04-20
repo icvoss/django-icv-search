@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 import logging
+from datetime import timedelta
 from typing import Any
+
+from django.utils import timezone
 
 from icv_search.backends import get_search_backend
 from icv_search.exceptions import SearchBackendError
@@ -837,3 +840,19 @@ def compact_index(
     index = resolve_index(name_or_index, tenant_id)
     backend = get_search_backend()
     return backend.compact(uid=index.engine_uid)
+
+
+def clear_sync_logs(*, days_older_than: int = 90) -> int:
+    """Delete IndexSyncLog rows older than the given number of days.
+
+    Args:
+        days_older_than: Records created more than this many days ago are
+            deleted.
+
+    Returns:
+        Number of records deleted.
+    """
+    cutoff = timezone.now() - timedelta(days=days_older_than)
+    deleted_count, _ = IndexSyncLog.objects.filter(created_at__lt=cutoff).delete()
+    logger.info("Deleted %d old index sync logs (older than %d days).", deleted_count, days_older_than)
+    return deleted_count

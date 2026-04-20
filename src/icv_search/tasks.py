@@ -210,6 +210,24 @@ def flush_debounce_buffer(index_pk: str) -> int:
 
 
 @shared_task
+def cleanup_sync_logs(days_older_than: int = 90) -> int:
+    """Delete old IndexSyncLog rows.
+
+    Intended as a periodic Celery beat task.  Records created more than
+    ``days_older_than`` days ago are permanently deleted.
+
+    Args:
+        days_older_than: Retention period in days.  Defaults to 90.
+
+    Returns:
+        Number of records deleted.
+    """
+    from icv_search.services.indexing import clear_sync_logs
+
+    return clear_sync_logs(days_older_than=days_older_than)
+
+
+@shared_task
 def cleanup_search_query_aggregates(days_older_than: int = 90) -> int:
     """Delete old search query aggregate rows.
 
