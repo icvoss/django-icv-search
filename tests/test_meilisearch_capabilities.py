@@ -326,12 +326,28 @@ class TestMeilisearchDeleteByFilter:
 
 
 class TestBaseBackendDeleteByFilter:
-    """BaseSearchBackend default raises NotImplementedError."""
+    """BaseSearchBackend default composes search() + delete_documents().
 
-    def test_raises_not_implemented(self):
+    Previously this raised NotImplementedError, breaking substitutability for
+    backends without a native filter-delete endpoint. The default now deletes
+    the matching documents.
+    """
+
+    def test_default_deletes_matching_documents(self):
+        DummyBackend.reset()
         backend = DummyBackend()
-        with pytest.raises(NotImplementedError):
-            backend.delete_documents_by_filter("products", "brand = 'Nike'")
+        backend.create_index("products")
+        backend.add_documents(
+            "products",
+            [{"id": "1", "brand": "Nike"}, {"id": "2", "brand": "Adidas"}],
+        )
+
+        # Portable Django-native dict filter — no NotImplementedError.
+        backend.delete_documents_by_filter("products", {"brand": "Nike"})
+
+        ids = {d["id"] for d in backend.search("products", "")["hits"]}
+        assert ids == {"2"}
+        DummyBackend.reset()
 
 
 # ===========================================================================
@@ -671,8 +687,10 @@ class TestDeleteDocumentsByFilterService:
             result = backend.delete_documents_by_filter("products", "brand = 'Nike'")
             assert result["taskUid"] == 99
 
-    def test_service_translates_dict_filter(self, db):
-        """When a dict filter is passed, it's translated to engine format."""
+    def test_service_dict_filter_deletes_via_fallback(self, db):
+        """A dict filter deletes matching docs even on a backend (Dummy)
+        without a native filter-delete endpoint — via the base fallback."""
+        from icv_search.services import search
         from icv_search.services.documents import delete_documents_by_filter
 
         create_index("products")
@@ -684,9 +702,10 @@ class TestDeleteDocumentsByFilterService:
             ],
         )
 
-        # DummyBackend raises NotImplementedError for delete_documents_by_filter
-        with pytest.raises(NotImplementedError):
-            delete_documents_by_filter("products", {"brand": "Nike"})
+        delete_documents_by_filter("products", {"brand": "Nike"})
+
+        remaining = {hit["id"] for hit in search("products", "").hits}
+        assert remaining == {"2"}
 
 
 # ===========================================================================

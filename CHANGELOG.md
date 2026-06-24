@@ -4,6 +4,19 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Fixed
+
+- `delete_documents_by_filter` is now substitutable across all backends.
+  Previously `BaseSearchBackend.delete_documents_by_filter` raised
+  `NotImplementedError`, so backends without a native filter-delete endpoint
+  (PostgreSQL, Dummy) could not satisfy the documented interface — callers had
+  to type-check the concrete backend. The base now provides a working default
+  that searches by the filter and deletes the matching primary keys via
+  `delete_documents`. Meilisearch keeps its native single-request override.
+  The service no longer pre-translates dict filters to Meilisearch string
+  syntax; the filter is passed through and each backend translates its own
+  (so a Django-native dict filter works everywhere).
+
 ## [1.1.2] - 2026-06-20
 
 ### Fixed

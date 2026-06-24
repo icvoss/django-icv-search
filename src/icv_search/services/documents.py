@@ -127,14 +127,13 @@ def delete_documents_by_filter(
     Returns:
         Normalised TaskResult for the engine operation.
     """
-    from icv_search.backends.filters import translate_filter_to_meilisearch
-
     index = resolve_index(name_or_index, tenant_id)
     backend = get_search_backend()
 
-    # Translate dict filters to engine-native string format.
-    if isinstance(filter_expr, dict):
-        filter_expr = translate_filter_to_meilisearch(filter_expr)
+    # Pass the filter through unchanged. Each backend accepts its native form:
+    # Meilisearch translates a dict to its filter string (and the fallback
+    # delete-by-filter in BaseSearchBackend routes dicts through search()),
+    # so a Django-native dict works across every backend.
 
     log = IndexSyncLog.objects.create(index=index, action="documents_deleted", status="pending")
 

@@ -6,7 +6,13 @@ import pytest
 
 from icv_search.backends import reset_search_backend
 from icv_search.backends.dummy import DummyBackend
-from icv_search.services import create_index, delete_document, index_documents, search
+from icv_search.services import (
+    create_index,
+    delete_document,
+    delete_documents_by_filter,
+    index_documents,
+    search,
+)
 from icv_search.types import TaskResult
 
 
@@ -110,3 +116,56 @@ class TestSearchQueryLogFactoryExport:
         from icv_search.testing import __all__
 
         assert "SearchQueryLogFactory" in __all__
+
+
+class TestDeleteDocumentsByFilterFallback:
+    """delete_documents_by_filter works on backends without a native endpoint.
+
+    Regression: the base backend raised NotImplementedError, so DummyBackend
+    and PostgresBackend could not satisfy the documented interface (LSP
+    violation). The base now composes search() + delete_documents().
+    """
+
+    @pytest.mark.django_db
+    def test_filter_delete_removes_matching_docs(self, products_index):
+        # Dummy backend has no native filter-delete — exercises the fallback.
+        result = delete_documents_by_filter(products_index, {"title": "Tennis Racket"})
+        assert isinstance(result, TaskResult)
+
+        remaining = {hit["id"] for hit in search(products_index, "").hits}
+        assert remaining == {"1", "3"}
+
+    @pytest.mark.django_db
+    def test_filter_delete_no_match_is_noop(self, products_index):
+        delete_documents_by_filter(products_index, {"title": "Nonexistent"})
+        remaining = {hit["id"] for hit in search(products_index, "").hits}
+        assert remaining == {"1", "2", "3"}
+
+    def test_backend_method_does_not_raise_not_implemented(self):
+        from icv_search.backends import get_search_backend
+
+        backend = get_search_backend()
+        backend.create_index("widgets")
+        backend.add_documents(
+            "widgets",
+            [{"id": "a", "kind": "x"}, {"id": "b", "kind": "y"}],
+        )
+        # Must not raise NotImplementedError.
+        backend.delete_documents_by_filter("widgets", {"kind": "x"})
+        ids = {d["id"] for d in backend.search("widgets", "")["hits"]}
+        assert ids == {"b"}
+
+    def test_fallback_paginates_past_scan_limit(self, monkeypatch):
+        from icv_search.backends import get_search_backend
+
+        backend = get_search_backend()
+        # Force a tiny scan window so the pagination loop runs more than once.
+        monkeypatch.setattr(type(backend), "_FILTER_DELETE_SCAN_LIMIT", 2, raising=False)
+
+        backend.create_index("bulk")
+        backend.add_documents(
+            "bulk",
+            [{"id": str(i), "drop": True} for i in range(5)],
+        )
+        backend.delete_documents_by_filter("bulk", {"drop": True})
+        assert backend.search("bulk", "")["hits"] == []

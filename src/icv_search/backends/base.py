@@ -87,20 +87,56 @@ class BaseSearchBackend(ABC):
     def delete_documents(self, uid: str, document_ids: list[str]) -> dict[str, Any]:
         """Remove documents by ID. Returns engine task info."""
 
-    def delete_documents_by_filter(self, uid: str, filter_expr: str) -> dict[str, Any]:
+    # Upper bound on documents the fallback delete-by-filter will collect in a
+    # single pass. Engines with native filter-deletion (e.g. Meilisearch)
+    # override delete_documents_by_filter and ignore this.
+    _FILTER_DELETE_SCAN_LIMIT = 1000
+
+    def delete_documents_by_filter(self, uid: str, filter_expr: Any) -> dict[str, Any]:
         """Remove documents matching a filter expression.
 
-        Not all engines support filter-based deletion. The default raises
-        ``NotImplementedError``.
+        The default implementation composes the two primitives every backend
+        already implements: it searches the index with ``filter_expr`` to
+        collect the matching primary keys, then calls :meth:`delete_documents`.
+        This keeps the method substitutable across all backends rather than
+        raising ``NotImplementedError`` on engines without a native
+        filter-delete endpoint.
+
+        Backends with a native single-request filter delete (e.g. Meilisearch)
+        should override this for efficiency and to avoid the scan limit.
 
         Args:
             uid: Index UID.
-            filter_expr: Engine-native filter expression string.
+            filter_expr: Filter in the form this backend's :meth:`search`
+                accepts (a Django-native dict, or an engine-native string).
 
         Returns:
             Engine task info dict.
         """
-        raise NotImplementedError(f"{self.__class__.__name__} does not support delete_documents_by_filter().")
+        ids: list[str] = []
+        offset = 0
+        while True:
+            response = self.search(
+                uid,
+                "",
+                filter=filter_expr,
+                limit=self._FILTER_DELETE_SCAN_LIMIT,
+                offset=offset,
+            )
+            hits = response.get("hits", [])
+            if not hits:
+                break
+            for hit in hits:
+                doc_id = hit.get("id")
+                if doc_id is not None:
+                    ids.append(str(doc_id))
+            if len(hits) < self._FILTER_DELETE_SCAN_LIMIT:
+                break
+            offset += self._FILTER_DELETE_SCAN_LIMIT
+
+        if not ids:
+            return {"deleted": 0, "document_ids": []}
+        return self.delete_documents(uid, ids)
 
     @abstractmethod
     def clear_documents(self, uid: str) -> dict[str, Any]:

@@ -121,12 +121,17 @@ class MeilisearchBackend(BaseSearchBackend):
         """Remove all documents using Meilisearch's DELETE /indexes/{uid}/documents."""
         return self._request("DELETE", f"/indexes/{uid}/documents")
 
-    def delete_documents_by_filter(self, uid: str, filter_expr: str) -> dict[str, Any]:
+    def delete_documents_by_filter(self, uid: str, filter_expr: Any) -> dict[str, Any]:
         """Remove documents matching a filter expression.
 
         Uses ``POST /indexes/{uid}/documents/delete`` with a JSON body
         containing the filter.  Requires Meilisearch v1.2+.
+
+        Accepts either an engine-native filter string or a Django-native
+        filter dict (translated automatically), matching :meth:`search`.
         """
+        if isinstance(filter_expr, dict):
+            filter_expr = translate_filter_to_meilisearch(filter_expr)
         return self._request(
             "POST",
             f"/indexes/{uid}/documents/delete",
