@@ -41,6 +41,10 @@ jobs:
       matrix:
         python-version: ["3.11", "3.12"]
         django-version: ["5.2", "6.0"]
+        exclude:
+          # Django 6.0 requires Python 3.12+
+          - python-version: "3.11"
+            django-version: "6.0"
 
     services:
       postgres:
