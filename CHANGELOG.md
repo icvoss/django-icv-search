@@ -4,6 +4,15 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- Squashed migration `0001_squashed_0006_alter_searchindex_settings_help_text` replacing 0001 to 0006. Existing
+  databases that applied the original series are unaffected (Django
+  no-ops through the `replaces` list); fresh installs apply the single
+  squashed migration. The replaced originals remain in the package and
+  will be removed in the next major release once all installations have
+  passed the squash point.
+
 ## [1.1.3] - 2026-06-24
 
 ### Fixed
