@@ -16,7 +16,7 @@ Practical guide for contributors.
 ## Local Development Setup
 
 ```bash
-git clone https://github.com/nigelcopley/django-icv-search.git
+git clone https://github.com/icvoss/django-icv-search.git
 cd django-icv-search
 
 # Create a virtual environment

@@ -1,6 +1,6 @@
 # django-icv-search
 
-[![CI](https://github.com/nigelcopley/django-icv-search/actions/workflows/ci.yml/badge.svg)](https://github.com/nigelcopley/django-icv-search/actions/workflows/ci.yml)
+[![CI](https://github.com/icvoss/django-icv-search/actions/workflows/ci.yml/badge.svg)](https://github.com/icvoss/django-icv-search/actions/workflows/ci.yml)
 [![PyPI](https://img.shields.io/pypi/v/django-icv-search)](https://pypi.org/project/django-icv-search/)
 [![Python](https://img.shields.io/pypi/pyversions/django-icv-search)](https://pypi.org/project/django-icv-search/)
 [![Django](https://img.shields.io/badge/django-5.1%2B-green)](https://pypi.org/project/django-icv-search/)

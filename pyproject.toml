@@ -33,11 +33,11 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/nigelcopley/django-icv-search"
-Documentation = "https://github.com/nigelcopley/django-icv-search/tree/main/docs"
-Changelog = "https://github.com/nigelcopley/django-icv-search/blob/main/CHANGELOG.md"
-"Issue Tracker" = "https://github.com/nigelcopley/django-icv-search/issues"
-"Source Code" = "https://github.com/nigelcopley/django-icv-search"
+Homepage = "https://github.com/icvoss/django-icv-search"
+Documentation = "https://github.com/icvoss/django-icv-search/tree/main/docs"
+Changelog = "https://github.com/icvoss/django-icv-search/blob/main/CHANGELOG.md"
+"Issue Tracker" = "https://github.com/icvoss/django-icv-search/issues"
+"Source Code" = "https://github.com/icvoss/django-icv-search"
 
 [project.optional-dependencies]
 icv-core = ["django-icv-core>=0.1.0"]
