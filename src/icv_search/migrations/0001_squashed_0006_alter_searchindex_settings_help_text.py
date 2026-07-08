@@ -8,7 +8,6 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     replaces = [
         ("icv_search", "0001_initial"),
         ("icv_search", "0002_searchquerylog"),
@@ -40,9 +39,7 @@ class Migration(migrations.Migration):
                 ),
                 (
                     "created_at",
-                    models.DateTimeField(
-                        auto_now_add=True, db_index=True, verbose_name="created at"
-                    ),
+                    models.DateTimeField(auto_now_add=True, db_index=True, verbose_name="created at"),
                 ),
                 (
                     "updated_at",
@@ -144,9 +141,7 @@ class Migration(migrations.Migration):
                 ),
                 (
                     "created_at",
-                    models.DateTimeField(
-                        auto_now_add=True, db_index=True, verbose_name="created at"
-                    ),
+                    models.DateTimeField(auto_now_add=True, db_index=True, verbose_name="created at"),
                 ),
                 (
                     "updated_at",
@@ -180,9 +175,7 @@ class Migration(migrations.Migration):
                 ),
                 (
                     "detail",
-                    models.TextField(
-                        blank=True, help_text="Error messages or sync metadata."
-                    ),
+                    models.TextField(blank=True, help_text="Error messages or sync metadata."),
                 ),
                 (
                     "task_uid",
@@ -223,9 +216,7 @@ class Migration(migrations.Migration):
                 ),
                 (
                     "created_at",
-                    models.DateTimeField(
-                        auto_now_add=True, db_index=True, verbose_name="created at"
-                    ),
+                    models.DateTimeField(auto_now_add=True, db_index=True, verbose_name="created at"),
                 ),
                 (
                     "updated_at",
@@ -355,9 +346,7 @@ class Migration(migrations.Migration):
                 ),
                 (
                     "created_at",
-                    models.DateTimeField(
-                        auto_now_add=True, db_index=True, verbose_name="created at"
-                    ),
+                    models.DateTimeField(auto_now_add=True, db_index=True, verbose_name="created at"),
                 ),
                 (
                     "updated_at",
@@ -435,9 +424,7 @@ class Migration(migrations.Migration):
                     )
                 ],
                 "indexes": [
-                    models.Index(
-                        fields=["index_name", "date"], name="icv_srch_agg_idx_dt"
-                    ),
+                    models.Index(fields=["index_name", "date"], name="icv_srch_agg_idx_dt"),
                     models.Index(
                         fields=["index_name", "tenant_id", "date"],
                         name="icv_srch_agg_tnt_dt",
@@ -460,9 +447,7 @@ class Migration(migrations.Migration):
                 ),
                 (
                     "created_at",
-                    models.DateTimeField(
-                        auto_now_add=True, db_index=True, verbose_name="created at"
-                    ),
+                    models.DateTimeField(auto_now_add=True, db_index=True, verbose_name="created at"),
                 ),
                 (
                     "updated_at",
@@ -548,9 +533,7 @@ class Migration(migrations.Migration):
                 ),
                 (
                     "field",
-                    models.CharField(
-                        help_text="Document field to evaluate.", max_length=200
-                    ),
+                    models.CharField(help_text="Document field to evaluate.", max_length=200),
                 ),
                 (
                     "field_value",
@@ -611,9 +594,7 @@ class Migration(migrations.Migration):
                 ),
                 (
                     "created_at",
-                    models.DateTimeField(
-                        auto_now_add=True, db_index=True, verbose_name="created at"
-                    ),
+                    models.DateTimeField(auto_now_add=True, db_index=True, verbose_name="created at"),
                 ),
                 (
                     "updated_at",
@@ -699,9 +680,7 @@ class Migration(migrations.Migration):
                 ),
                 (
                     "destination_url",
-                    models.URLField(
-                        help_text="URL to redirect the user to.", max_length=2000
-                    ),
+                    models.URLField(help_text="URL to redirect the user to.", max_length=2000),
                 ),
                 (
                     "destination_type",
@@ -755,9 +734,7 @@ class Migration(migrations.Migration):
                 ),
                 (
                     "created_at",
-                    models.DateTimeField(
-                        auto_now_add=True, db_index=True, verbose_name="created at"
-                    ),
+                    models.DateTimeField(auto_now_add=True, db_index=True, verbose_name="created at"),
                 ),
                 (
                     "updated_at",
@@ -894,9 +871,7 @@ class Migration(migrations.Migration):
                 ),
                 (
                     "created_at",
-                    models.DateTimeField(
-                        auto_now_add=True, db_index=True, verbose_name="created at"
-                    ),
+                    models.DateTimeField(auto_now_add=True, db_index=True, verbose_name="created at"),
                 ),
                 (
                     "updated_at",
@@ -1077,9 +1052,7 @@ class Migration(migrations.Migration):
                 ),
                 (
                     "created_at",
-                    models.DateTimeField(
-                        auto_now_add=True, db_index=True, verbose_name="created at"
-                    ),
+                    models.DateTimeField(auto_now_add=True, db_index=True, verbose_name="created at"),
                 ),
                 (
                     "updated_at",
@@ -1165,9 +1138,7 @@ class Migration(migrations.Migration):
                 ),
                 (
                     "document_id",
-                    models.CharField(
-                        help_text="ID of the document to pin.", max_length=255
-                    ),
+                    models.CharField(help_text="ID of the document to pin.", max_length=255),
                 ),
                 (
                     "position",
@@ -1208,9 +1179,7 @@ class Migration(migrations.Migration):
                 ),
                 (
                     "created_at",
-                    models.DateTimeField(
-                        auto_now_add=True, db_index=True, verbose_name="created at"
-                    ),
+                    models.DateTimeField(auto_now_add=True, db_index=True, verbose_name="created at"),
                 ),
                 (
                     "updated_at",
@@ -1359,9 +1328,7 @@ class Migration(migrations.Migration):
                 ),
                 (
                     "created_at",
-                    models.DateTimeField(
-                        auto_now_add=True, db_index=True, verbose_name="created at"
-                    ),
+                    models.DateTimeField(auto_now_add=True, db_index=True, verbose_name="created at"),
                 ),
                 (
                     "updated_at",
@@ -1430,9 +1397,7 @@ class Migration(migrations.Migration):
                         fields=["index_name", "query", "created_at"],
                         name="icv_srch_clk_qry_dt",
                     ),
-                    models.Index(
-                        fields=["index_name", "document_id"], name="icv_srch_clk_doc"
-                    ),
+                    models.Index(fields=["index_name", "document_id"], name="icv_srch_clk_doc"),
                 ],
             },
         ),
@@ -1451,9 +1416,7 @@ class Migration(migrations.Migration):
                 ),
                 (
                     "created_at",
-                    models.DateTimeField(
-                        auto_now_add=True, db_index=True, verbose_name="created at"
-                    ),
+                    models.DateTimeField(auto_now_add=True, db_index=True, verbose_name="created at"),
                 ),
                 (
                     "updated_at",
