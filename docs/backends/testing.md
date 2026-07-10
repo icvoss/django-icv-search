@@ -21,7 +21,7 @@ for unit and integration tests.
   service-layer wiring)
 
 **Limitations:**
-- No real relevance ranking — term frequency only
+- No real relevance ranking: term frequency only
 - No typo tolerance or stemming
 - Not suitable for testing relevance quality or engine-specific features
 
@@ -109,8 +109,8 @@ index = SearchIndexFactory(name="products", primary_key="id")
 ```python
 from icv_search.testing.fixtures import search_backend, search_index
 
-# search_index — creates a SearchIndex instance via SearchIndexFactory
-# search_backend — configures DummyBackend and resets between tests
+# search_index: creates a SearchIndex instance via SearchIndexFactory
+# search_backend: configures DummyBackend and resets between tests
 ```
 
 ### Helpers

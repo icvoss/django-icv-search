@@ -9,7 +9,7 @@ Practical guide for contributors.
 - Python 3.11 or later
 - [uv](https://docs.astral.sh/uv/) (recommended) or pip
 - Django 5.1 or later (installed as part of the dev setup)
-- PostgreSQL 14 or later (required by some tests — see below)
+- PostgreSQL 14 or later (required by some tests; see below)
 
 ---
 
@@ -70,7 +70,7 @@ All Python code is linted and formatted with [ruff](https://docs.astral.sh/ruff/
 | Target Python | 3.11 |
 
 ```bash
-# Check (no writes — what CI runs)
+# Check (no writes; what CI runs)
 ruff check .
 ruff format --check .
 
@@ -117,7 +117,7 @@ Use [Conventional Commits](https://www.conventionalcommits.org/):
 | `chore` | Maintenance, version bumps, dependency updates |
 | `docs` | Documentation only |
 | `test` | Adding or updating tests |
-| `style` | Formatting, whitespace — no logic change |
+| `style` | Formatting, whitespace; no logic change |
 | `refactor` | Code change that is neither a fix nor a feature |
 
 ### Branches and PRs

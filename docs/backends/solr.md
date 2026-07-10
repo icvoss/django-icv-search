@@ -8,14 +8,14 @@ SolrCloud's horizontal scalability are priorities.
 
 ## Overview
 
-- **Mature and stable** — Apache Solr has been production-proven for 15+ years
-- **Deep faceting** — JSON Facet API supports nested, pivoted, and statistical
+- **Mature and stable**: Apache Solr has been production-proven for 15+ years
+- **Deep faceting**: JSON Facet API supports nested, pivoted, and statistical
   facets beyond what other backends offer
-- **SolrCloud** — built-in distributed search with ZooKeeper-based coordination
-- **Cursor-based pagination** — efficient deep pagination via `cursorMark`
-- **Atomic updates** — `update_documents()` supports Solr's modifier syntax for
+- **SolrCloud**: built-in distributed search with ZooKeeper-based coordination
+- **Cursor-based pagination**: efficient deep pagination via `cursorMark`
+- **Atomic updates**: `update_documents()` supports Solr's modifier syntax for
   true partial field updates
-- **MoreLikeThis** — `similar_documents()` uses the Solr MLT handler
+- **MoreLikeThis**: `similar_documents()` uses the Solr MLT handler
 
 ---
 
@@ -90,11 +90,11 @@ docker compose up -d
 
 | Setting | Default | Description |
 |---------|---------|-------------|
-| `ICV_SEARCH_BACKEND` | — | Set to `"icv_search.backends.solr.SolrBackend"` |
-| `ICV_SEARCH_URL` | — | Solr base URL, e.g. `"http://localhost:8983/solr"` |
+| `ICV_SEARCH_BACKEND` | (none) | Set to `"icv_search.backends.solr.SolrBackend"` |
+| `ICV_SEARCH_URL` | (none) | Solr base URL, e.g. `"http://localhost:8983/solr"` |
 | `ICV_SEARCH_API_KEY` | `""` | Solr Basic Auth password. Leave empty if auth is disabled |
 | `ICV_SEARCH_TIMEOUT` | `30` | Request timeout in seconds |
-| `ICV_SEARCH_BACKEND_OPTIONS` | `{}` | Extra constructor kwargs — see below |
+| `ICV_SEARCH_BACKEND_OPTIONS` | `{}` | Extra constructor kwargs: see below |
 
 ### `ICV_SEARCH_BACKEND_OPTIONS` Keys
 
@@ -138,8 +138,8 @@ The backend selects the pysolr client based on `zookeeper_hosts`:
 
 | Mode | `zookeeper_hosts` | Client |
 |------|-------------------|--------|
-| Standalone | `""` (empty) | `pysolr.Solr` — connects directly to `{url}/{collection}` |
-| SolrCloud | `"zoo1:2181,..."` | `pysolr.SolrCloud` — routes via ZooKeeper leader election |
+| Standalone | `""` (empty) | `pysolr.Solr`: connects directly to `{url}/{collection}` |
+| SolrCloud | `"zoo1:2181,..."` | `pysolr.SolrCloud`: routes via ZooKeeper leader election |
 
 For production, always use SolrCloud mode. Standalone mode is convenient for
 local development but does not provide replication or automatic failover.
@@ -159,7 +159,7 @@ runtime via the Schema API. icv-search uses the Schema API to push
 and `stopWords`.
 
 Note: `filterableAttributes`, `sortableAttributes`, `rankingRules`, and
-`typoTolerance` are silently skipped — configure these directly in your Solr
+`typoTolerance` are silently skipped; configure these directly in your Solr
 schema or `solrconfig.xml`.
 
 ---
@@ -205,13 +205,13 @@ update_documents("products", [
 **ZooKeeper ensemble**
 - Run ZooKeeper as a 3-node ensemble (odd number required for quorum) in
   production. A single ZooKeeper node is a single point of failure.
-- ZooKeeper nodes should have dedicated disks — latency spikes cause leader
+- ZooKeeper nodes should have dedicated disks: latency spikes cause leader
   re-election and can briefly impact Solr collection availability.
 
 **Collection sizing**
 - Each shard is a separate Lucene index. Start with enough shards to distribute
   your data evenly across nodes, then add replicas for fault tolerance.
-- A reasonable starting point: 1–2 shards per node, 2 replicas per shard.
+- A reasonable starting point: 1 to 2 shards per node, 2 replicas per shard.
 
 **Auto-commit tuning**
 - `commit_within` controls when documents become visible to searchers. Lower
@@ -228,17 +228,17 @@ update_documents("products", [
 
 ## Known Limitations
 
-- **No facet search on text fields** — `facet_search()` uses the JSON Facet API
+- **No facet search on text fields**: `facet_search()` uses the JSON Facet API
   `prefix` filter, which works on `string` (keyword) fields only. Text fields
   require a `copyField` to a string field for faceting.
-- **Index swap is not atomic** — `swap_indexes()` uses two sequential
+- **Index swap is not atomic**: `swap_indexes()` uses two sequential
   `CREATEALIAS` calls. A failure on the second call leaves one alias updated
   and one not. Handle partial-swap state at the service layer.
-- **MoreLikeThis requires configuration** — `similar_documents()` requires
+- **MoreLikeThis requires configuration**: `similar_documents()` requires
   the MLT request handler to be configured in `solrconfig.xml`. It raises
   `SearchBackendError` if the component is not present.
-- **Settings are partially applied** — only `searchableAttributes`, `synonyms`,
+- **Settings are partially applied**: only `searchableAttributes`, `synonyms`,
   and `stopWords` are pushed to Solr. All other icv-search settings are logged
   and skipped.
-- **No async task queue** — all operations are synchronous; `get_task()` always
+- **No async task queue**: all operations are synchronous; `get_task()` always
   returns a synthetic succeeded dict.

@@ -9,13 +9,13 @@ for your project.
 
 | Backend | Best For | Scale | Infra Required | SDK | Install |
 |---------|----------|-------|----------------|-----|---------|
-| **Meilisearch** | Small–medium catalogues, developer experience | Single-node | None (default) | httpx (bundled) | `pip install django-icv-search` |
+| **Meilisearch** | Small to medium catalogues, developer experience | Single-node | None (default) | httpx (bundled) | `pip install django-icv-search` |
 | **PostgreSQL** | Zero-infrastructure, small datasets | Existing Postgres | None (bundled) | psycopg2 (via Django) | `pip install django-icv-search` |
 | **OpenSearch** | Large-scale, rich aggregations | Distributed cluster | OpenSearch cluster | opensearch-py | `pip install django-icv-search[opensearch]` |
 | **Solr** | Massive catalogues, deep faceting | SolrCloud cluster | Solr + ZooKeeper | pysolr | `pip install django-icv-search[solr]` |
-| **Typesense** | Medium–large, typo tolerance, instant search | HA cluster | Typesense cluster | typesense | `pip install django-icv-search[typesense]` |
+| **Typesense** | Medium to large, typo tolerance, instant search | HA cluster | Typesense cluster | typesense | `pip install django-icv-search[typesense]` |
 | **Vespa** | Billions of documents, ML ranking, hybrid search | Vespa cluster | Vespa cluster | pyvespa | `pip install django-icv-search[vespa]` |
-| **Dummy** | Testing only | In-memory | None (bundled) | — | `pip install django-icv-search` |
+| **Dummy** | Testing only | In-memory | None (bundled) | (none) | `pip install django-icv-search` |
 
 ---
 
@@ -85,10 +85,10 @@ search use cases up to ~20M documents.
 
 ## Individual Backend Guides
 
-- [meilisearch.md](meilisearch.md) — Default backend, easiest setup
-- [postgresql.md](postgresql.md) — Zero-infrastructure, uses your existing database
-- [opensearch.md](opensearch.md) — Large-scale, AWS-compatible, rich aggregations
-- [solr.md](solr.md) — Battle-tested, SolrCloud, deep faceting
-- [typesense.md](typesense.md) — Typo-tolerant, schema-enforced, instant search
-- [vespa.md](vespa.md) — ML ranking, hybrid search, billions of documents
-- [testing.md](testing.md) — DummyBackend for tests, CI Docker Compose
+- [meilisearch.md](meilisearch.md): Default backend, easiest setup
+- [postgresql.md](postgresql.md): Zero-infrastructure, uses your existing database
+- [opensearch.md](opensearch.md): Large-scale, AWS-compatible, rich aggregations
+- [solr.md](solr.md): Battle-tested, SolrCloud, deep faceting
+- [typesense.md](typesense.md): Typo-tolerant, schema-enforced, instant search
+- [vespa.md](vespa.md): ML ranking, hybrid search, billions of documents
+- [testing.md](testing.md): DummyBackend for tests, CI Docker Compose

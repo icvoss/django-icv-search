@@ -8,12 +8,12 @@ aggregations, full-text search at scale, or an AWS-native deployment.
 
 ## Overview
 
-- **Distributed** — horizontal sharding and replication across a cluster
-- **Rich aggregations** — `terms`, `date_histogram`, `range`, `nested`, and more
+- **Distributed**: horizontal sharding and replication across a cluster
+- **Rich aggregations**: `terms`, `date_histogram`, `range`, `nested`, and more
   via the `facets` param or raw aggregation dicts
-- **AWS-compatible** — supports AWS SigV4 authentication for OpenSearch Service
-- **More-like-this** — `similar_documents()` uses OpenSearch's `more_like_this` query
-- **Partial updates** — `update_documents()` uses bulk `update` actions, so only
+- **AWS-compatible**: supports AWS SigV4 authentication for OpenSearch Service
+- **More-like-this**: `similar_documents()` uses OpenSearch's `more_like_this` query
+- **Partial updates**: `update_documents()` uses bulk `update` actions, so only
   specified fields are modified
 
 ---
@@ -42,7 +42,7 @@ docker run -d \
   opensearchproject/opensearch:latest
 ```
 
-Port 9200 is the REST API. Port 9600 is the performance analyser. `DISABLE_SECURITY_PLUGIN=true` disables auth for local development — never use this in production.
+Port 9200 is the REST API. Port 9600 is the performance analyser. `DISABLE_SECURITY_PLUGIN=true` disables auth for local development; never use this in production.
 
 Verify:
 
@@ -56,11 +56,11 @@ curl http://localhost:9200
 
 | Setting | Default | Description |
 |---------|---------|-------------|
-| `ICV_SEARCH_BACKEND` | — | Set to `"icv_search.backends.opensearch.OpenSearchBackend"` |
+| `ICV_SEARCH_BACKEND` | (none) | Set to `"icv_search.backends.opensearch.OpenSearchBackend"` |
 | `ICV_SEARCH_URL` | `"http://localhost:7700"` | OpenSearch node URL, e.g. `"https://opensearch.internal:9200"` |
 | `ICV_SEARCH_API_KEY` | `""` | API key for API-key auth, or leave empty for other auth methods |
 | `ICV_SEARCH_TIMEOUT` | `30` | Request timeout in seconds |
-| `ICV_SEARCH_BACKEND_OPTIONS` | `{}` | Extra kwargs passed to `OpenSearchBackend.__init__()` — see below |
+| `ICV_SEARCH_BACKEND_OPTIONS` | `{}` | Extra kwargs passed to `OpenSearchBackend.__init__()`: see below |
 
 ### `ICV_SEARCH_BACKEND_OPTIONS` Keys
 
@@ -214,8 +214,8 @@ print(results.facet_distribution)
 ## Production Considerations
 
 **Shard sizing**
-- Aim for shards between 10–50 GB. Oversharding is a common mistake — a
-  cluster of 50M documents typically needs 2–5 primary shards, not 50.
+- Aim for shards between 10 to 50 GB. Oversharding is a common mistake: a
+  cluster of 50M documents typically needs 2 to 5 primary shards, not 50.
 - Start with 1 primary shard per index and increase as data grows.
 
 **Replica count**
@@ -240,14 +240,14 @@ print(results.facet_distribution)
 
 ## Known Limitations
 
-- **Synonyms and stop-words require index close/open** — applying analysis
+- **Synonyms and stop-words require index close/open**: applying analysis
   settings causes a brief period where the index is unavailable. Schedule
   these changes during a maintenance window on production.
-- **No facet search on keyword fields without extra mapping** — `facet_search()`
+- **No facet search on keyword fields without extra mapping**: `facet_search()`
   uses a `terms` aggregation with an `include` regex. On high-cardinality
   fields this can be slow; consider a dedicated completion suggester instead.
-- **Geo field default is `"location"`** — if your documents use a different
+- **Geo field default is `"location"`**: if your documents use a different
   field name, pass `geo_field` in the search params.
-- **Index swap uses aliases** — when `index_a` is not already an alias, the
+- **Index swap uses aliases**: when `index_a` is not already an alias, the
   backend creates `index_a_live` pointing to `index_b`. Your application must
   query the alias name, not the physical index name.

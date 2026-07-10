@@ -8,15 +8,15 @@ billions-of-documents scale.
 
 ## Overview
 
-- **Massive scale** — designed for billions of documents with horizontal
+- **Massive scale**: designed for billions of documents with horizontal
   scaling across content clusters
-- **ML ranking** — native support for custom ranking expressions, tensor
+- **ML ranking**: native support for custom ranking expressions, tensor
   features, and ONNX/TensorFlow model integration
-- **Hybrid search** — combine dense vector (ANN) retrieval with traditional
+- **Hybrid search**: combine dense vector (ANN) retrieval with traditional
   BM25 text search in a single query via `nearestNeighbor` + `userQuery()`
-- **Real-time updates** — `update_documents()` uses Vespa's `assign` operator
+- **Real-time updates**: `update_documents()` uses Vespa's `assign` operator
   for field-level partial updates with no re-indexing required
-- **YQL query language** — a SQL-like query language that can be passed
+- **YQL query language**: a SQL-like query language that can be passed
   directly via the `filter` param for advanced use cases
 
 ---
@@ -74,11 +74,11 @@ full application package setup.
 
 | Setting | Default | Description |
 |---------|---------|-------------|
-| `ICV_SEARCH_BACKEND` | — | Set to `"icv_search.backends.vespa.VespaBackend"` |
-| `ICV_SEARCH_URL` | — | Vespa application URL, e.g. `"http://localhost:8080"` or `"https://my-app.vespa-app.cloud"` |
+| `ICV_SEARCH_BACKEND` | (none) | Set to `"icv_search.backends.vespa.VespaBackend"` |
+| `ICV_SEARCH_URL` | (none) | Vespa application URL, e.g. `"http://localhost:8080"` or `"https://my-app.vespa-app.cloud"` |
 | `ICV_SEARCH_API_KEY` | `""` | Vespa Cloud token ID, or leave empty for self-hosted with mTLS |
 | `ICV_SEARCH_TIMEOUT` | `30` | Request timeout in seconds |
-| `ICV_SEARCH_BACKEND_OPTIONS` | `{}` | Extra constructor kwargs — see below |
+| `ICV_SEARCH_BACKEND_OPTIONS` | `{}` | Extra constructor kwargs: see below |
 
 ### `ICV_SEARCH_BACKEND_OPTIONS` Keys
 
@@ -180,7 +180,7 @@ vespa deploy --wait 300
 from icv_search.services import create_index
 
 # Validates connectivity and registers the UID locally.
-# Does NOT create a schema in Vespa — that was done by vespa deploy.
+# Does NOT create a schema in Vespa; that was done by vespa deploy.
 create_index("product")
 ```
 
@@ -274,7 +274,7 @@ field with `hnsw` indexing.
 **Content cluster sizing**
 - Content nodes store documents and serve queries. Size them based on:
   - Document count × average document size × replication factor × headroom (1.5×)
-  - Typically 60–70% of node memory for data storage, 30% for query buffers
+  - Typically 60 to 70% of node memory for data storage, 30% for query buffers
 
 **Schema change caveats**
 - Adding new fields is non-breaking and handled via redeploy.
@@ -294,33 +294,33 @@ field with `hnsw` indexing.
 
 Vespa has a steep operational curve. Do not choose it if:
 
-- Your dataset is under a few million documents — Meilisearch or OpenSearch
+- Your dataset is under a few million documents: Meilisearch or OpenSearch
   will be faster to set up and easier to operate.
 - Your team does not have capacity to manage a distributed Java application
   or learn YQL and Vespa's application package model.
-- You only need simple keyword search without ML ranking — the operational
+- You only need simple keyword search without ML ranking: the operational
   overhead is not justified.
-- You need index swap (zero-downtime reindex via swap) — Vespa uses
+- You need index swap (zero-downtime reindex via swap): Vespa uses
   application redeployment for this, which is outside icv-search's scope.
 
 ---
 
 ## Known Limitations
 
-- **No index swap** — `swap_indexes()` raises `NotImplementedError`. Use
+- **No index swap**: `swap_indexes()` raises `NotImplementedError`. Use
   Vespa's application redeployment (`vespa deploy`) for zero-downtime schema
   updates.
-- **No facet search** — `facet_search()` raises `NotImplementedError`. Use the
+- **No facet search**: `facet_search()` raises `NotImplementedError`. Use the
   `facets` param in `search()` to obtain facet counts via Vespa's grouping API.
-- **No similar documents via the generic backend** — `similar_documents()` raises
+- **No similar documents via the generic backend**: `similar_documents()` raises
   `NotImplementedError`. Implement nearest-neighbour similarity by passing a
   raw `nearestNeighbor` YQL fragment in the `filter` param to `search()`.
-- **Schema lives outside Django** — Vespa schemas must be managed as files in
+- **Schema lives outside Django**: Vespa schemas must be managed as files in
   the application package. `create_index()` validates connectivity and registers
   the UID locally but does not create a Vespa schema.
-- **Settings are advisory only** — `update_settings()` stores settings locally
+- **Settings are advisory only**: `update_settings()` stores settings locally
   and logs a warning. It does not push schema changes to Vespa.
-- **In-memory registry is per-process** — `_index_registry` and
+- **In-memory registry is per-process**: `_index_registry` and
   `_settings_registry` are instance-level dicts. In a multi-worker deployment,
   each worker builds its own registry from `create_index()` calls made during
   startup or first use.

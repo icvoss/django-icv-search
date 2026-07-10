@@ -12,9 +12,9 @@ Search for Django without the lock-in. Point it at Meilisearch, PostgreSQL, or y
 
 ## Why this over the alternatives?
 
-**Over the raw Meilisearch SDK:** you get Django-native filters (`price__gte=10`), auto-indexing on model save, zero-downtime reindexing, Celery integration, search analytics, and a merchandising layer — none of which the SDK provides.
+**Over the raw Meilisearch SDK:** you get Django-native filters (`price__gte=10`), auto-indexing on model save, zero-downtime reindexing, Celery integration, search analytics, and a merchandising layer, none of which the SDK provides.
 
-**Over django-haystack:** modern async-capable HTTP client (httpx), swappable backends without engine-specific query syntax, built-in multi-tenancy, and a merchandising pipeline for controlling result presentation — all with a much smaller footprint.
+**Over django-haystack:** modern async-capable HTTP client (httpx), swappable backends without engine-specific query syntax, built-in multi-tenancy, and a merchandising pipeline for controlling result presentation, all with a much smaller footprint.
 
 **Over both:** one consistent service API regardless of backend, normalised response dataclasses that insulate your code from engine-specific shapes, and a `DummyBackend` for fast, deterministic tests without a running search engine.
 
@@ -30,42 +30,42 @@ Search for Django without the lock-in. Point it at Meilisearch, PostgreSQL, or y
 ## Features
 
 ### Core
-- Swappable backends modelled on Django's email backend pattern — change one setting, no application code changes
+- Swappable backends modelled on Django's email backend pattern: change one setting, no application code changes
 - Django-native filter dicts and sort lists translated to each engine's syntax automatically
 - Normalised `SearchResult`, `TaskResult`, and `IndexStats` dataclasses insulate your code from engine-specific response shapes
-- `SearchableMixin` — declare a model as indexable with a handful of class attributes
+- `SearchableMixin`: declare a model as indexable with a handful of class attributes
 - Auto-indexing via `post_save` / `post_delete` signals; disable per-block with `skip_index_update()`
 - `SearchQuery` fluent builder: `.text().filter().sort().facets().highlight().geo_near().execute()`
-- `ICVSearchPaginator` — uses `estimated_total_hits` from the engine; no extra `COUNT` query
+- `ICVSearchPaginator`: uses `estimated_total_hits` from the engine; no extra `COUNT` query
 
 ### Backends
-- **Meilisearch** — default; uses `httpx` directly, keeping dependencies minimal
-- **PostgreSQL** — zero-infrastructure full-text search using `tsvector` and `ts_rank`; no external service needed
-- **DummyBackend** — in-memory backend for fast, deterministic tests
-- **Custom backends** — subclass `BaseSearchBackend` and implement the abstract interface
+- **Meilisearch**: default; uses `httpx` directly, keeping dependencies minimal
+- **PostgreSQL**: zero-infrastructure full-text search using `tsvector` and `ts_rank`; no external service needed
+- **DummyBackend**: in-memory backend for fast, deterministic tests
+- **Custom backends**: subclass `BaseSearchBackend` and implement the abstract interface
 
 ### Indexing and index management
 - Create, configure, sync, and delete indexes; Django is the source of truth
-- Zero-downtime reindex — builds a temp index, then atomically swaps with the live one
+- Zero-downtime reindex: builds a temp index, then atomically swaps with the live one
 - Celery integration for async indexing with exponential backoff; degrades gracefully to synchronous when Celery is absent
-- Signal debouncing — batches rapid saves into a single indexing call
-- Soft-delete awareness — auto-excludes soft-deleted records on reindex and removes them on save
+- Signal debouncing: batches rapid saves into a single indexing call
+- Soft-delete awareness: auto-excludes soft-deleted records on reindex and removes them on save
 - Management commands: `icv_search_setup`, `icv_search_health`, `icv_search_sync`, `icv_search_reindex`, `icv_search_create_index`, `icv_search_clear`
 
 ### Query features
-- Facet distribution — normalised `facet_distribution` dict with `get_facet_values()` helper
-- Range filters — `__gte`, `__gt`, `__lte`, `__lt` suffixes work across all backends
-- Highlighting — `formatted_hits` with custom pre/post tags; native on Meilisearch, `ts_headline()` on PostgreSQL
-- Ranking scores — `_rankingScore` on Meilisearch, `ts_rank` on PostgreSQL, term-frequency on Dummy
-- Geo-distance search — filter and sort by proximity; native `_geoRadius` on Meilisearch, Haversine on others
-- Multi-search — execute multiple queries in one request
+- Facet distribution: normalised `facet_distribution` dict with `get_facet_values()` helper
+- Range filters: `__gte`, `__gt`, `__lte`, `__lt` suffixes work across all backends
+- Highlighting: `formatted_hits` with custom pre/post tags; native on Meilisearch, `ts_headline()` on PostgreSQL
+- Ranking scores: `_rankingScore` on Meilisearch, `ts_rank` on PostgreSQL, term-frequency on Dummy
+- Geo-distance search: filter and sort by proximity; native `_geoRadius` on Meilisearch, Haversine on others
+- Multi-search: execute multiple queries in one request
 - Synonym, stop-word, and typo-tolerance management
 
 ### Analytics
 - `SearchQueryLog` per-query logging and `SearchQueryAggregate` daily rollups
 - Three logging strategies: `individual`, `aggregate`, or `both`; sample rate control for high-traffic sites
 - `get_popular_queries()`, `get_zero_result_queries()`, `get_search_stats()`, `get_query_trend()`
-- `get_trending_searches()` and `get_suggested_queries()` from existing aggregate data — no external service needed
+- `get_trending_searches()` and `get_suggested_queries()` from existing aggregate data: no external service needed
 
 ### Merchandising (optional)
 - Query redirects, query rewrites, pinned results, boost rules, search banners, and zero-result fallbacks
@@ -75,11 +75,11 @@ Search for Django without the lock-in. Point it at Meilisearch, PostgreSQL, or y
 - Gated behind `ICV_SEARCH_MERCHANDISING_ENABLED`; when disabled, `merchandised_search()` delegates directly to `search()`
 
 ### Infrastructure
-- Multi-tenancy — tenant-prefixed index names via a configurable callable; no coupling to any tenant model
+- Multi-tenancy: tenant-prefixed index names via a configurable callable; no coupling to any tenant model
 - Result caching via Django's cache framework; automatic invalidation on index changes
 - Health check endpoint (`/health/`) for load balancer probes
 - Django signals for index lifecycle events (`search_index_created`, `documents_indexed`, etc.)
-- `icv_search.testing` — fixtures, factories, and helpers for consuming projects
+- `icv_search.testing`: fixtures, factories, and helpers for consuming projects
 
 ---
 
@@ -192,7 +192,7 @@ All settings are namespaced under `ICV_SEARCH_*`. Every setting has a sensible d
 | `ICV_SEARCH_LOG_QUERIES` | `bool` | `False` | Log every `search()` call to `SearchQueryLog` |
 | `ICV_SEARCH_LOG_ZERO_RESULTS_ONLY` | `bool` | `False` | When `True`, only zero-result queries are logged |
 | `ICV_SEARCH_LOG_MODE` | `str` | `"individual"` | Logging strategy: `"individual"`, `"aggregate"`, or `"both"` |
-| `ICV_SEARCH_LOG_SAMPLE_RATE` | `float` | `1.0` | Fraction of individual `SearchQueryLog` rows to write (0.0–1.0). Aggregate counts always record at 100% |
+| `ICV_SEARCH_LOG_SAMPLE_RATE` | `float` | `1.0` | Fraction of individual `SearchQueryLog` rows to write (0.0 to 1.0). Aggregate counts always record at 100% |
 | `ICV_SEARCH_CACHE_ENABLED` | `bool` | `False` | Enable search result caching via Django's cache framework |
 | `ICV_SEARCH_CACHE_TIMEOUT` | `int` | `60` | Cache TTL in seconds for stored search results |
 | `ICV_SEARCH_CACHE_ALIAS` | `str` | `"default"` | Django cache alias used by the search result cache |
@@ -205,7 +205,7 @@ All settings are namespaced under `ICV_SEARCH_*`. Every setting has a sensible d
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
-| `model` | `str` | required | `"app_label.ModelName"` — the Django model to watch |
+| `model` | `str` | required | `"app_label.ModelName"`: the Django model to watch |
 | `on_save` | `bool` | `True` | Index the document when the model instance is saved |
 | `on_delete` | `bool` | `True` | Remove the document when the model instance is deleted |
 | `async` | `bool` | from `ICV_SEARCH_ASYNC_INDEXING` | Override async behaviour for this index only |
@@ -546,7 +546,7 @@ for i, hit in enumerate(result.hits):
     print(f"{hit['name']}: {score:.2f}")
 ```
 
-Meilisearch returns `_rankingScore` (0.0–1.0), PostgreSQL uses `ts_rank`, DummyBackend computes term-frequency.
+Meilisearch returns `_rankingScore` (0.0 to 1.0), PostgreSQL uses `ts_rank`, DummyBackend computes term-frequency.
 
 ### Geo-Distance Search
 
@@ -772,7 +772,7 @@ results = (
 )
 ```
 
-**Note:** `page` and `hits_per_page` are mutually exclusive with `limit` and `offset` — use one approach per query. Page-based mode is **Meilisearch-only**. The `total_hits` and `total_pages` fields on `SearchResult` are `None` when offset-based pagination is used.
+**Note:** `page` and `hits_per_page` are mutually exclusive with `limit` and `offset`; use one approach per query. Page-based mode is **Meilisearch-only**. The `total_hits` and `total_pages` fields on `SearchResult` are `None` when offset-based pagination is used.
 
 To control the maximum result window, configure `pagination.maxTotalHits` on the index (default 1000):
 
@@ -841,7 +841,7 @@ Geo bounding box and polygon are **Meilisearch-only**. Use the existing `.geo_ne
 
 ### Field Restriction
 
-#### `attributes_to_retrieve` — limit returned fields
+#### `attributes_to_retrieve`: limit returned fields
 
 Reduce response payload by restricting which fields are returned in hits:
 
@@ -864,7 +864,7 @@ results = (
 
 Supported on **all backends**. On PostgreSQL and DummyBackend the filtering is applied in Python after the search.
 
-#### `attributes_to_search_on` — limit search scope
+#### `attributes_to_search_on`: limit search scope
 
 Restrict which fields are searched at query time, without modifying the index's permanent `searchableAttributes` configuration:
 
@@ -1035,7 +1035,7 @@ result = delete_documents_by_filter("products", {"is_active": False})
 print(result.task_uid)
 ```
 
-Returns a `TaskResult`. The operation is asynchronous on Meilisearch — use `get_task(result.task_uid)` to poll for completion.
+Returns a `TaskResult`. The operation is asynchronous on Meilisearch; use `get_task(result.task_uid)` to poll for completion.
 
 `delete_documents_by_filter` is **Meilisearch-only**. Calling it on PostgreSQL or DummyBackend raises `SearchBackendError`.
 
@@ -1136,7 +1136,7 @@ Trade ranking accuracy for indexing speed:
 from icv_search.services import get_proximity_precision, update_proximity_precision
 
 update_proximity_precision("products", "byAttribute")   # faster indexing
-update_proximity_precision("products", "byWord")        # default — precise
+update_proximity_precision("products", "byWord")        # default: precise
 ```
 
 #### Search cutoff
@@ -1296,8 +1296,8 @@ ICV_SEARCH_LOG_MODE = "individual"  # or "aggregate" or "both"
 
 | Mode | Storage | Best for |
 |------|---------|----------|
-| `"individual"` | One `SearchQueryLog` row per query | Low/medium traffic — full query history |
-| `"aggregate"` | Daily rollups in `SearchQueryAggregate` | High traffic — compact long-term storage |
+| `"individual"` | One `SearchQueryLog` row per query | Low/medium traffic: full query history |
+| `"aggregate"` | Daily rollups in `SearchQueryAggregate` | High traffic: compact long-term storage |
 | `"both"` | Both individual rows and daily rollups | Detailed recent logs plus long-term trends |
 
 ```python
@@ -1311,7 +1311,7 @@ from icv_search.services import (
 # Most frequent queries in the last 7 days
 popular = get_popular_queries("products", days=7, limit=20)
 
-# Queries returning no results — find content gaps
+# Queries returning no results: find content gaps
 gaps = get_zero_result_queries("products", days=7)
 
 # Aggregate stats
@@ -1338,7 +1338,7 @@ ICV_SEARCH_TENANT_PREFIX_FUNC = "myproject.search.get_tenant_prefix"
 ```
 
 ```python
-# In a view — tenant_id is injected automatically
+# In a view: tenant_id is injected automatically
 results = search("products", "widget")
 
 # Explicit tenant_id always takes precedence
@@ -1383,22 +1383,22 @@ All merchandising models inherit from `MerchandisingRuleBase`, which provides qu
 | `SearchPin` | Pin a document to a fixed position (or use `-1` to bury it) |
 | `BoostRule` | Multiply ranking scores based on a field value comparison |
 | `SearchBanner` | Attach a banner (title, content, image, CTA) to search results |
-| `ZeroResultFallback` | Define what to show when a query returns nothing — redirect, alternative query, curated results, or popular-in-category |
+| `ZeroResultFallback` | Define what to show when a query returns nothing: redirect, alternative query, curated results, or popular-in-category |
 
 ### The Pipeline
 
 `merchandised_search()` composes all features into a 9-step pipeline:
 
 ```
-1. Feature gate     — disabled? delegate to search()
-2. Normalise query  — strip, collapse whitespace, lowercase
-3. Redirect check   — short-circuit with URL if matched
-4. Query rewrite    — replace query, merge filters/sort
-5. Search           — call search() with the (possibly rewritten) query
-6. Pin insertion    — insert/move pinned documents
-7. Boost re-rank    — multiply scores, re-sort
-8. Fallback         — zero results? try alternative strategy
-9. Banner attach    — attach matching banners to the result
+1. Feature gate     - disabled? delegate to search()
+2. Normalise query  - strip, collapse whitespace, lowercase
+3. Redirect check   - short-circuit with URL if matched
+4. Query rewrite    - replace query, merge filters/sort
+5. Search           - call search() with the (possibly rewritten) query
+6. Pin insertion    - insert/move pinned documents
+7. Boost re-rank    - multiply scores, re-sort
+8. Fallback         - zero results? try alternative strategy
+9. Banner attach    - attach matching banners to the result
 ```
 
 Each step is individually skippable:
@@ -1441,7 +1441,7 @@ for hit in result.hits:
 
 ### Search Suggestions
 
-`get_trending_searches()` and `get_suggested_queries()` derive from existing `SearchQueryAggregate` data — no external service needed:
+`get_trending_searches()` and `get_suggested_queries()` derive from existing `SearchQueryAggregate` data; no external service needed:
 
 ```python
 from icv_search.services import get_trending_searches, get_suggested_queries
@@ -1614,7 +1614,7 @@ python manage.py icv_search_reindex --index products --model myapp.models.Produc
 python manage.py icv_search_clear --index products
 ```
 
-`SearchIndex` records are also auto-created on first use — calling `search("products", "shoes")` creates the record if it does not exist. `icv_search_setup` is the recommended way to provision indexes explicitly during deployment.
+`SearchIndex` records are also auto-created on first use: calling `search("products", "shoes")` creates the record if it does not exist. `icv_search_setup` is the recommended way to provision indexes explicitly during deployment.
 
 ---
 
@@ -1751,7 +1751,7 @@ class ArticleFactory(factory.django.DjangoModelFactory):
 
 ## Multi-Tenancy
 
-Tenant-prefixed index names via a configurable callable. No foreign key to a tenant model — no coupling to any specific tenant implementation.
+Tenant-prefixed index names via a configurable callable. No foreign key to a tenant model: no coupling to any specific tenant implementation.
 
 ```python
 # myproject/search.py

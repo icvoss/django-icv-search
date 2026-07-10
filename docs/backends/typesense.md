@@ -8,14 +8,14 @@ responsiveness and easy clustering matter.
 
 ## Overview
 
-- **Typo tolerance** — built-in, configurable tolerance for character transpositions
+- **Typo tolerance**: built-in, configurable tolerance for character transpositions
   and spelling errors
-- **Schema-enforced** — field types are declared upfront; documents must match the
+- **Schema-enforced**: field types are declared upfront; documents must match the
   schema or they are rejected
-- **Fast** — written in C++ for low-latency responses
-- **Simple HA clustering** — pass a `nodes` list to get multi-node redundancy with
+- **Fast**: written in C++ for low-latency responses
+- **Simple HA clustering**: pass a `nodes` list to get multi-node redundancy with
   no ZooKeeper or complex consensus protocol
-- **Partial updates** — `update_documents()` uses `action=emplace`, preserving
+- **Partial updates**: `update_documents()` uses `action=emplace`, preserving
   existing fields not included in the update
 
 ---
@@ -44,7 +44,7 @@ docker run -d \
   --enable-cors
 ```
 
-Use a specific version tag (e.g. `27.1`) — Typesense does not publish a `latest` tag consistently. `--enable-cors` is required for browser-based clients making direct API calls.
+Use a specific version tag (e.g. `27.1`); Typesense does not publish a `latest` tag consistently. `--enable-cors` is required for browser-based clients making direct API calls.
 
 Verify:
 
@@ -59,13 +59,13 @@ curl -H "X-TYPESENSE-API-KEY: your-api-key" http://localhost:8108/health
 
 | Setting | Default | Description |
 |---------|---------|-------------|
-| `ICV_SEARCH_BACKEND` | — | Set to `"icv_search.backends.typesense.TypesenseBackend"` |
-| `ICV_SEARCH_URL` | — | Typesense server URL, e.g. `"http://localhost:8108"` |
+| `ICV_SEARCH_BACKEND` | (none) | Set to `"icv_search.backends.typesense.TypesenseBackend"` |
+| `ICV_SEARCH_URL` | (none) | Typesense server URL, e.g. `"http://localhost:8108"` |
 | `ICV_SEARCH_API_KEY` | `""` | Admin or scoped API key |
 | `ICV_SEARCH_TIMEOUT` | `30` | Connection timeout in seconds |
 | `ICV_SEARCH_TYPESENSE_FIELD_TYPES` | `{}` | Mapping of field name → Typesense type string for schema generation |
 | `ICV_SEARCH_TYPESENSE_GEO_FIELD` | `"_geo"` | Field name for geo search (type `geopoint`) |
-| `ICV_SEARCH_BACKEND_OPTIONS` | `{}` | Extra constructor kwargs — see below |
+| `ICV_SEARCH_BACKEND_OPTIONS` | `{}` | Extra constructor kwargs: see below |
 
 ### `ICV_SEARCH_BACKEND_OPTIONS` Keys
 
@@ -104,7 +104,7 @@ ICV_SEARCH_BACKEND_OPTIONS = {
 ```
 
 When `nodes` is provided in `ICV_SEARCH_BACKEND_OPTIONS`, `ICV_SEARCH_URL` is
-still required but is used only to satisfy the setting — the nodes list takes
+still required but is used only to satisfy the setting; the nodes list takes
 precedence for connection routing.
 
 ---
@@ -196,8 +196,8 @@ Minimum 3 nodes is required for a fault-tolerant cluster (1 node can fail).
 
 Generate scoped API keys for production:
 
-- **Admin key** — full access, used by Django for indexing and management
-- **Search key** — limited to search operations only, safe for client-side use
+- **Admin key**: full access, used by Django for indexing and management
+- **Search key**: limited to search operations only, safe for client-side use
 
 Create scoped keys via the Typesense API or admin UI. Set `ICV_SEARCH_API_KEY`
 to the admin key in your Django application.
@@ -207,8 +207,8 @@ to the admin key in your Django application.
 ## Production Considerations
 
 **RAM requirements**
-- Typesense keeps its index in memory. Provision RAM generously — a rough guide
-  is 2–4× the size of your raw document data.
+- Typesense keeps its index in memory. Provision RAM generously: a rough guide
+  is 2 to 4× the size of your raw document data.
 - Monitor memory usage and set OS-level swap to prevent OOM kills.
 
 **Schema changes**
@@ -229,15 +229,15 @@ to the admin key in your Django application.
 
 ## Known Limitations
 
-- **No similar documents** — Typesense does not have a native
+- **No similar documents**: Typesense does not have a native
   more-like-this or similarity search feature. `similar_documents()` raises
   `NotImplementedError`.
-- **Schema changes require field recreation** — changing the type of an
+- **Schema changes require field recreation**: changing the type of an
   existing field requires a full collection drop and recreate.
-- **No multi-search aggregation of facets** — facet counts are per-query;
+- **No multi-search aggregation of facets**: facet counts are per-query;
   cross-index facet merging must be done at the application layer.
-- **Sorting requires a `sort: true` field** — fields used in `sort` must have
+- **Sorting requires a `sort: true` field**: fields used in `sort` must have
   `ICV_SEARCH_TYPESENSE_FIELD_TYPES` declared and the `sortableAttributes`
   setting configured before documents are indexed.
-- **No async task queue** — all operations are synchronous; `get_task()` returns
+- **No async task queue**: all operations are synchronous; `get_task()` returns
   a synthetic succeeded dict.

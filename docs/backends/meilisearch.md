@@ -1,17 +1,17 @@
 # Meilisearch Backend
 
-The default backend. No extra dependencies — `httpx` is already bundled with
+The default backend. No extra dependencies: `httpx` is already bundled with
 `django-icv-search`. Ideal for getting search running in minutes.
 
 ---
 
 ## Overview
 
-- **Default backend** — works out of the box without changing `ICV_SEARCH_BACKEND`
-- **No SDK dependency** — communicates directly with the Meilisearch HTTP API via `httpx`
-- **Feature-complete** — full-text search, filtering, sorting, faceting, facet search,
+- **Default backend**: works out of the box without changing `ICV_SEARCH_BACKEND`
+- **No SDK dependency**: communicates directly with the Meilisearch HTTP API via `httpx`
+- **Feature-complete**: full-text search, filtering, sorting, faceting, facet search,
   highlighting, geo search, similar documents, multi-search, index swap, NDJSON import
-- **Performance sweet spot** — excellent up to ~10–20M documents on a single node
+- **Performance sweet spot**: excellent up to ~10 to 20M documents on a single node
 
 ---
 
@@ -36,7 +36,7 @@ docker run -d \
   getmeili/meilisearch:latest
 ```
 
-Set `MEILI_MASTER_KEY` to enable authentication. Without it, Meilisearch runs in development mode with no auth — never use this in production.
+Set `MEILI_MASTER_KEY` to enable authentication. Without it, Meilisearch runs in development mode with no auth; never use this in production.
 
 Verify it is running:
 
@@ -51,7 +51,7 @@ curl http://localhost:7700/health
 
 | Setting | Default | Description |
 |---------|---------|-------------|
-| `ICV_SEARCH_BACKEND` | `"icv_search.backends.meilisearch.MeilisearchBackend"` | This is the default — no change needed |
+| `ICV_SEARCH_BACKEND` | `"icv_search.backends.meilisearch.MeilisearchBackend"` | This is the default: no change needed |
 | `ICV_SEARCH_URL` | `"http://localhost:7700"` | Meilisearch instance URL |
 | `ICV_SEARCH_API_KEY` | `""` | Master key or a scoped search API key |
 | `ICV_SEARCH_TIMEOUT` | `30` | Request timeout in seconds |
@@ -157,14 +157,14 @@ dashboard before calling `similar_documents()`.
 ## Production Considerations
 
 **API key security**
-- Never commit API keys to source control — use environment variables.
+- Never commit API keys to source control; use environment variables.
 - Use the master/search key pattern: restrict `ICV_SEARCH_API_KEY` to only
   the actions your application needs.
 
 **Index size limits**
 - A single Meilisearch instance is limited by available RAM. As a rough guide,
-  allow ~2–3× the uncompressed size of your indexed data as RAM.
-- Meilisearch loads its entire index into memory. 10–20M small documents on a
+  allow ~2 to 3× the uncompressed size of your indexed data as RAM.
+- Meilisearch loads its entire index into memory. 10 to 20M small documents on a
   single node is a practical ceiling; above this consider OpenSearch or Solr.
 
 **Async indexing**
@@ -184,13 +184,13 @@ dashboard before calling `similar_documents()`.
 
 ## Known Limitations
 
-- **Single-node only** — Meilisearch does not support horizontal sharding across
+- **Single-node only**: Meilisearch does not support horizontal sharding across
   multiple nodes in the community edition. For distributed search, use OpenSearch.
-- **No native partial updates** — `update_documents()` performs a full document
+- **No native partial updates**: `update_documents()` performs a full document
   upsert (replaces the entire document). Use `add_documents()` with the complete
   document if you need to change a single field.
-- **Async task queue** — index operations return a task UID; the engine processes
+- **Async task queue**: index operations return a task UID; the engine processes
   them asynchronously. If you need to confirm completion, poll `get_task()` or
   use Meilisearch's `waitForTask` pattern. icv-search does not automatically wait.
-- **Performance ceiling** — above ~20M documents, query latency begins to
+- **Performance ceiling**: above ~20M documents, query latency begins to
   degrade on typical hardware. Consider migrating to OpenSearch at that scale.
