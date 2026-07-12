@@ -298,6 +298,61 @@ def get_search_queryset(cls):
 
 ---
 
+## Discovery contract: the mixin is a convenience, not a requirement
+
+`SearchableMixin` is the fastest way to make a model indexable, but it is
+optional. Auto-indexing has exactly two requirements, both duck-typed:
+
+1. The model is registered in `ICV_SEARCH_AUTO_INDEX` (see above).
+2. The instance provides a `to_search_document() -> dict` method.
+
+`connect_auto_index_signals()` checks `hasattr(model_class, "to_search_document")`
+when wiring signals, and `_index_instance()` checks the same thing again at
+index time. Neither check cares whether the method came from `SearchableMixin`
+or was written by hand. Any model satisfying the protocol works, with no
+inheritance from an icv-search base class required.
+
+This follows [ADR-025](https://github.com/icvoss/oss/blob/main/docs/adrs/ADR-025-ecosystem-responsibility-map.md)
+principle 2 (discovery is pull-based, by protocol): a package that observes
+objects owned elsewhere must accept any object satisfying the documented
+protocol, never require a mixin. Content packages that want search coverage
+(a CMS page model, for example) are never obliged to know `icv_search` exists
+beyond implementing this one method.
+
+A model implementing the protocol directly, without `SearchableMixin`:
+
+```python
+# blog/models.py
+from django.db import models
+
+class Article(models.Model):
+    title = models.CharField(max_length=200)
+    body = models.TextField()
+    is_published = models.BooleanField(default=False)
+
+    def to_search_document(self) -> dict:
+        return {
+            "id": str(self.pk),
+            "title": self.title,
+            "body": self.body,
+            "is_published": self.is_published,
+        }
+```
+
+```python
+# settings.py
+ICV_SEARCH_AUTO_INDEX = {
+    "articles": {"model": "blog.Article"},
+}
+```
+
+That is the whole contract. `SearchableMixin` exists because most models want
+the same field-list-to-document mapping, soft-delete awareness, and geo
+support; reach for it when that saves you writing boilerplate, skip it when
+your document shape does not fit the mixin's field-list model.
+
+---
+
 ## Service API
 
 Import service functions from `icv_search.services`:
