@@ -11,6 +11,7 @@ build/
 .pytest_cache/
 htmlcov/
 coverage.xml
+coverage.json
 .coverage
 *.so
 .env

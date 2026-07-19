@@ -6,7 +6,7 @@ into temporary indexes using both approaches. Prints wall-clock time,
 docs/sec, and speedup ratio.
 
 Usage:
-    python benchmarks/bench_bulk_index.py [OPTIONS]
+    python tests/benchmarks/bench_bulk_index.py [OPTIONS]
 
     --url           Meilisearch URL (default: http://127.0.0.1:7700)
     --source-index  Index to read documents from (default: vendably_products)
