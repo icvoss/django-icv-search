@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.2.3] - 2026-08-09
+
+### Fixed
+
+- `publish.yml` did not install `celery`, unlike `ci.yml`, so the six
+  debounce tests failed on the tag-triggered run with
+  `AttributeError: ... does not have the attribute 'apply_async'`: without
+  celery, `@shared_task`'s no-op fallback returns a bare function. The
+  1.2.2 tag was cut but never published as a result. The two workflows now
+  install the same set.
+
 ## [1.2.2] - 2026-08-09
 
 ### Fixed
