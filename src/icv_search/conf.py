@@ -93,10 +93,27 @@ ICV_SEARCH_BULK_BATCH_SIZE: int = getattr(settings, "ICV_SEARCH_BULK_BATCH_SIZE"
 ICV_SEARCH_BULK_CONCURRENCY: int = getattr(settings, "ICV_SEARCH_BULK_CONCURRENCY", 2)
 
 # Debounce window for auto-index signal batching (in seconds).
-# When > 0, rapid successive saves are batched into a single indexing task
-# dispatched after this delay. Requires Django's cache framework.
-# Set to 0 to disable debouncing (each save dispatches immediately).
+# When > 0, rapid successive saves (and, since #6, deletes) are batched into
+# a single indexing/removal task dispatched after this delay. Requires
+# Django's cache framework. Set to 0 to disable debouncing (each save/delete
+# dispatches immediately).
 ICV_SEARCH_DEBOUNCE_SECONDS: int = getattr(settings, "ICV_SEARCH_DEBOUNCE_SECONDS", 0)
+
+# Maximum number of buffered documents/IDs per index before the debounce
+# buffer flushes early, regardless of the time window (#7). Without a cap, a
+# high-rate save/delete loop (bulk backfill, reprocessing) accumulates the
+# entire operation in one in-memory cache buffer and flushes it as a single
+# request. When the buffer reaches this size, a flush is scheduled
+# immediately (countdown=0) instead of waiting out the remaining debounce
+# window.
+ICV_SEARCH_DEBOUNCE_MAX_BUFFER_SIZE: int = getattr(settings, "ICV_SEARCH_DEBOUNCE_MAX_BUFFER_SIZE", 500)
+
+# Chunk size used when flushing a debounce buffer to the backend (#7). The
+# buffer itself has no hard ceiling beyond ICV_SEARCH_DEBOUNCE_MAX_BUFFER_SIZE
+# (which only triggers an early flush, not a drop), so the flush task sends
+# the buffered documents/IDs to the backend in chunks of this size rather
+# than a single unbounded request.
+ICV_SEARCH_DEBOUNCE_FLUSH_CHUNK_SIZE: int = getattr(settings, "ICV_SEARCH_DEBOUNCE_FLUSH_CHUNK_SIZE", 500)
 
 # Query logging — when True, every search() call creates a SearchQueryLog record.
 ICV_SEARCH_LOG_QUERIES: bool = getattr(settings, "ICV_SEARCH_LOG_QUERIES", False)
