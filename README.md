@@ -442,6 +442,28 @@ print(stats.document_count)
 print(stats.is_indexing)
 ```
 
+`stats.raw` carries the engine's unmodified `/stats` response. On Meilisearch
+this includes `databaseSize` and `usedDatabaseSize`. **Do not use
+`usedDatabaseSize / databaseSize` as a disk-health or "how full is the disk"
+signal.** Both fields describe LMDB's memory-map allocation, not the
+filesystem:
+
+- `databaseSize` is the current LMDB map allocation. On Meilisearch 1.39+
+  there is no fixed map ceiling; the map grows on demand, so the ratio is
+  not a measure of remaining physical disk space.
+- LMDB never returns freed pages to the OS after deletes. Deleting a large
+  number of documents frees pages *inside* the map file for reuse but does
+  not shrink `usedDatabaseSize`, `databaseSize`, or the underlying
+  `data.mdb` file. A guard built on this ratio will hover near its
+  threshold indefinitely and will not drop after a large delete, which is
+  the opposite of what an operator expects.
+
+If you need an actual disk-health signal, check filesystem free space on
+the Meilisearch data path directly (e.g. `df`), not this ratio. The only
+way to shrink Meilisearch's on-disk file size is a dump-and-reimport or a
+reindex-from-scratch into a new index followed by a swap; deletes alone
+never reclaim space on disk.
+
 ### Document Operations
 
 #### `index_documents`

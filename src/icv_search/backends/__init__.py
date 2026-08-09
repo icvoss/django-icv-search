@@ -17,26 +17,29 @@ def get_search_backend(*, force_new: bool = False) -> BaseSearchBackend:
 
     The backend is instantiated once per process and cached. Pass
     ``force_new=True`` to create a fresh instance (useful in tests).
+
+    Reads the backend settings directly from ``django.conf.settings`` at
+    call time, not from ``icv_search.conf``'s re-exported constants: those
+    are evaluated once, at first import, so they never observe a setting
+    reassigned afterwards (as pytest-django's ``settings`` fixture does,
+    once per test). Baking the value in here would silently keep using
+    whatever backend was configured for the first test that ever built one
+    in the process, for the rest of the test session.
     """
     global _backend_instance  # noqa: PLW0603
 
     if _backend_instance is not None and not force_new:
         return _backend_instance
 
-    from icv_search.conf import (
-        ICV_SEARCH_API_KEY,
-        ICV_SEARCH_BACKEND,
-        ICV_SEARCH_BACKEND_OPTIONS,
-        ICV_SEARCH_TIMEOUT,
-        ICV_SEARCH_URL,
-    )
+    from django.conf import settings
 
-    backend_class = import_string(ICV_SEARCH_BACKEND)
+    backend_path = getattr(settings, "ICV_SEARCH_BACKEND", "icv_search.backends.meilisearch.MeilisearchBackend")
+    backend_class = import_string(backend_path)
     _backend_instance = backend_class(
-        url=ICV_SEARCH_URL,
-        api_key=ICV_SEARCH_API_KEY,
-        timeout=ICV_SEARCH_TIMEOUT,
-        **ICV_SEARCH_BACKEND_OPTIONS,
+        url=getattr(settings, "ICV_SEARCH_URL", "http://localhost:7700"),
+        api_key=getattr(settings, "ICV_SEARCH_API_KEY", ""),
+        timeout=getattr(settings, "ICV_SEARCH_TIMEOUT", 30),
+        **getattr(settings, "ICV_SEARCH_BACKEND_OPTIONS", {}),
     )
     return _backend_instance
 

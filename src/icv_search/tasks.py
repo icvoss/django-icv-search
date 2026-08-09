@@ -157,13 +157,35 @@ def reindex_zero_downtime_task(index_pk: str, model_path: str, batch_size: int =
     return reindex_zero_downtime(index, model_class, batch_size=batch_size)
 
 
+def _get_debounce_flush_chunk_size() -> int:
+    """Read ICV_SEARCH_DEBOUNCE_FLUSH_CHUNK_SIZE from Django settings."""
+    from django.conf import settings
+
+    return getattr(settings, "ICV_SEARCH_DEBOUNCE_FLUSH_CHUNK_SIZE", 500)
+
+
+def _chunked(items: list, chunk_size: int) -> list[list]:
+    """Split *items* into chunks of at most *chunk_size*.
+
+    A non-positive chunk_size disables chunking (one chunk containing all
+    items), matching the pre-#7 behaviour for anyone who explicitly opts out.
+    """
+    if chunk_size <= 0:
+        return [items] if items else []
+    return [items[i : i + chunk_size] for i in range(0, len(items), chunk_size)]
+
+
 @shared_task
 def flush_debounce_buffer(index_pk: str) -> int:
     """Drain the debounce buffer for an index and index all buffered documents.
 
-    Called after the debounce window expires. Reads buffered document dicts
-    from the Django cache, clears the buffer, and indexes them in a single
-    batch call.
+    Called after the debounce window expires (or immediately, once the
+    buffer reached ICV_SEARCH_DEBOUNCE_MAX_BUFFER_SIZE, see auto_index.py).
+    Reads buffered document dicts from the Django cache, clears the buffer,
+    and indexes them in chunks of ICV_SEARCH_DEBOUNCE_FLUSH_CHUNK_SIZE rather
+    than a single request for the whole buffer (#7): an unbounded flush
+    materialises the entire accumulated buffer in memory and sends it as one
+    oversized request.
     """
     from django.core.cache import cache
 
@@ -175,7 +197,7 @@ def flush_debounce_buffer(index_pk: str) -> int:
     try:
         index = SearchIndex.objects.get(pk=index_pk)
     except SearchIndex.DoesNotExist:
-        logger.warning("SearchIndex %s not found — clearing debounce buffer.", index_pk)
+        logger.warning("SearchIndex %s not found; clearing debounce buffer.", index_pk)
         cache.delete(cache_key)
         return 0
 
@@ -194,18 +216,70 @@ def flush_debounce_buffer(index_pk: str) -> int:
         seen[doc_id] = doc
 
     unique_docs = list(seen.values())
+    chunk_size = _get_debounce_flush_chunk_size()
 
     try:
-        index_documents(index, unique_docs, primary_key=pk_field)
+        for chunk in _chunked(unique_docs, chunk_size):
+            index_documents(index, chunk, primary_key=pk_field)
         logger.info(
-            "Flushed debounce buffer for '%s': %d documents (%d deduplicated).",
+            "Flushed debounce buffer for '%s': %d documents (%d deduplicated) in chunks of %d.",
             index.name,
             len(unique_docs),
             len(documents) - len(unique_docs),
+            chunk_size,
         )
         return len(unique_docs)
     except Exception:
         logger.exception("Failed to flush debounce buffer for '%s'.", index.name)
+        raise
+
+
+@shared_task
+def flush_debounce_removal_buffer(index_pk: str) -> int:
+    """Drain the debounce removal buffer for an index and remove all buffered IDs.
+
+    Mirrors :func:`flush_debounce_buffer` for the delete path (#6, #7).
+    Reads buffered document IDs from the Django cache, clears the buffer,
+    and removes them in chunks of ICV_SEARCH_DEBOUNCE_FLUSH_CHUNK_SIZE.
+    """
+    from django.core.cache import cache
+
+    from icv_search.models import SearchIndex
+    from icv_search.services.documents import remove_documents
+
+    cache_key = f"icv_search:debounce_removal:{index_pk}"
+
+    try:
+        index = SearchIndex.objects.get(pk=index_pk)
+    except SearchIndex.DoesNotExist:
+        logger.warning("SearchIndex %s not found; clearing debounce removal buffer.", index_pk)
+        cache.delete(cache_key)
+        return 0
+
+    # Atomically read and clear the buffer
+    document_ids = cache.get(cache_key, [])
+    if not document_ids:
+        return 0
+
+    cache.delete(cache_key)
+
+    # Deduplicate (a document deleted twice in the same window only needs one call)
+    unique_ids = list(dict.fromkeys(str(doc_id) for doc_id in document_ids))
+    chunk_size = _get_debounce_flush_chunk_size()
+
+    try:
+        for chunk in _chunked(unique_ids, chunk_size):
+            remove_documents(index, chunk)
+        logger.info(
+            "Flushed debounce removal buffer for '%s': %d document IDs (%d deduplicated) in chunks of %d.",
+            index.name,
+            len(unique_ids),
+            len(document_ids) - len(unique_ids),
+            chunk_size,
+        )
+        return len(unique_ids)
+    except Exception:
+        logger.exception("Failed to flush debounce removal buffer for '%s'.", index.name)
         raise
 
 

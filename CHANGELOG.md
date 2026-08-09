@@ -2,6 +2,62 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+### Fixed
+
+- **Security**: the click-tracking endpoint (`POST /api/icv-search/click/`)
+  accepted a `tenant_id` field from client-supplied JSON and passed it
+  through to `log_click()` unchecked. Since the endpoint is CSRF-exempt and
+  publicly reachable, any caller could attribute a click event to an
+  arbitrary tenant. Tenant attribution is now always derived server-side
+  from `icv_search.middleware.get_current_tenant_id()` (populated by
+  `ICVSearchTenantMiddleware`); a `tenant_id` in the request body, if
+  present, is ignored (#9).
+- `auto_index.py` dispatched one Celery task per document on bulk
+  delete/save (`_handle_post_delete` had no debounce/coalescing at all,
+  unlike the save path). A bulk delete firing per-row `post_delete`
+  signals could flood the queue with one `remove_documents` task per row.
+  The delete path now shares the same debounce buffering as the save
+  path, via `ICV_SEARCH_DEBOUNCE_SECONDS` (#6).
+- The debounce buffer (save and, since #6, delete) had no size cap and
+  flushed the entire accumulated buffer in a single request. A high-rate
+  save/delete loop (bulk backfill, reprocessing) could accumulate the
+  whole operation in memory before flushing as one oversized request. The
+  buffer now flushes early once it reaches
+  `ICV_SEARCH_DEBOUNCE_MAX_BUFFER_SIZE` (default 500), and the flush
+  itself is sent to the backend in chunks of
+  `ICV_SEARCH_DEBOUNCE_FLUSH_CHUNK_SIZE` (default 500) rather than a
+  single unbounded call (#7).
+- `services.indexing.create_index()` raised `IndexNotFoundError` on the
+  very first call for a given index name when using `PostgresBackend`
+  with `ICV_SEARCH_AUTO_SYNC` on (the default) and Celery unavailable.
+  `index.save()` fired the auto-sync `post_save` signal, which called
+  `backend.update_settings()` synchronously, before `backend.create_index()`
+  had actually provisioned the engine-side index; for `PostgresBackend`,
+  `update_settings()` requires the index metadata row to already exist.
+  `backend.create_index()` now runs before `index.save()`, so the engine
+  index exists before anything tries to sync settings to it. A
+  `create_index()` failure still results in a saved `SearchIndex` row and
+  a "failed" `IndexSyncLog` entry, per BR-007 (#10).
+
+### Added
+
+- `ICV_SEARCH_DEBOUNCE_MAX_BUFFER_SIZE` setting (default `500`): triggers
+  an early debounce flush once the buffer reaches this size, regardless
+  of the remaining time window. Set to `0` to disable (time-only
+  flushing, matching pre-#7 behaviour).
+- `ICV_SEARCH_DEBOUNCE_FLUSH_CHUNK_SIZE` setting (default `500`): chunk
+  size used when a debounce flush sends buffered documents/IDs to the
+  backend. Set to `0` to disable chunking (a single request for the
+  whole buffer, matching pre-#7 behaviour).
+
+### Docs
+
+- Documented that `/stats` `usedDatabaseSize / databaseSize` (Meilisearch)
+  is an LMDB memory-map ratio, not a physical disk usage signal, and does
+  not shrink after large deletes. See `get_index_stats` in the README (#8).
+
 ## [1.2.1] - 2026-07-12
 
 ### Fixed

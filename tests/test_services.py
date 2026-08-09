@@ -5,8 +5,9 @@ from __future__ import annotations
 import pytest
 
 from icv_search.backends import get_search_backend, reset_search_backend
+from icv_search.backends.base import BaseSearchBackend
 from icv_search.backends.dummy import DummyBackend, _documents, _indexes
-from icv_search.exceptions import SearchBackendError
+from icv_search.exceptions import IndexNotFoundError, SearchBackendError
 from icv_search.models import IndexSyncLog, SearchIndex
 from icv_search.services import (
     IndexStats,
@@ -87,6 +88,122 @@ class TestCreateIndex:
         assert log.status == "failed"
 
         backend.create_index = original
+
+
+class _PostgresLikeBackend(BaseSearchBackend):
+    """Reproduces PostgresBackend's real ordering contract without a DB.
+
+    ``update_settings()`` raises ``IndexNotFoundError`` unless
+    ``create_index()`` has already been called for that uid, exactly like
+    ``icv_search.backends.postgres.PostgresBackend.update_settings()``
+    (``UPDATE ... WHERE index_uid = %s`` with ``rowcount == 0``).
+    """
+
+    _created_uids: set[str] = set()
+
+    def __init__(self, url: str = "", api_key: str = "", timeout: int = 30, **kwargs):
+        super().__init__(url=url, api_key=api_key, timeout=timeout)
+
+    @classmethod
+    def reset(cls) -> None:
+        cls._created_uids = set()
+
+    def create_index(self, uid, primary_key="id"):
+        self._created_uids.add(uid)
+        return {"taskUid": f"fake-create-{uid}", "indexUid": uid, "status": "succeeded"}
+
+    def update_settings(self, uid, settings):
+        if uid not in self._created_uids:
+            raise IndexNotFoundError(f"Index '{uid}' not found.")
+        return {"taskUid": f"fake-settings-{uid}"}
+
+    def delete_index(self, uid):
+        self._created_uids.discard(uid)
+
+    def get_settings(self, uid):
+        return {}
+
+    def add_documents(self, uid, documents, primary_key="id"):
+        return {}
+
+    def delete_documents(self, uid, document_ids):
+        return {}
+
+    def clear_documents(self, uid):
+        return {}
+
+    def search(self, uid, query, **params):
+        return {}
+
+    def health(self):
+        return True
+
+    def get_stats(self, uid):
+        return {}
+
+
+class TestCreateIndexEngineProvisioningOrder:
+    """Regression tests for #10: create_index() must provision the engine
+    index before the Django row's post_save signal tries to sync settings
+    to it, or backends whose update_settings() requires the index to
+    already exist (PostgresBackend) raise IndexNotFoundError on every
+    first-ever create_index() call for a name.
+    """
+
+    @pytest.fixture(autouse=True)
+    def _use_postgres_like_backend(self, settings):
+        settings.ICV_SEARCH_BACKEND = "tests.test_services._PostgresLikeBackend"
+        # The exact conditions from #10: auto-sync on, synchronous (no Celery).
+        settings.ICV_SEARCH_AUTO_SYNC = True
+        settings.ICV_SEARCH_ASYNC_INDEXING = False
+        reset_search_backend()
+        _PostgresLikeBackend.reset()
+        yield
+        _PostgresLikeBackend.reset()
+        reset_search_backend()
+
+    @pytest.mark.django_db
+    def test_first_create_index_call_does_not_raise_index_not_found(self):
+        """The exact #10 repro: create_index() must not raise IndexNotFoundError
+        on the very first call for a name, when AUTO_SYNC fires update_settings()
+        synchronously via post_save before this fix's reordering."""
+        index = create_index("cms_pages", settings={"searchableAttributes": ["title"]})
+
+        assert index.is_synced is True
+
+    @pytest.mark.django_db
+    def test_first_create_index_call_marks_success_log(self):
+        index = create_index("cms_pages", settings={"searchableAttributes": ["title"]})
+
+        log = IndexSyncLog.objects.filter(index=index, action="created").first()
+        assert log is not None
+        assert log.status == "success"
+
+    @pytest.mark.django_db
+    def test_engine_index_exists_before_settings_sync_is_attempted(self):
+        """backend.create_index() must run, and complete, before any
+        update_settings() call for the same uid (whether from the signal
+        or from create_index()'s own explicit sync)."""
+        index = create_index("cms_pages", settings={"searchableAttributes": ["title"]})
+
+        assert index.engine_uid in _PostgresLikeBackend._created_uids
+
+    @pytest.mark.django_db
+    def test_create_index_engine_failure_still_saves_index_and_failed_log(self):
+        """BR-007: every backend operation is logged, even when
+        backend.create_index() itself fails outright (not just
+        update_settings racing it)."""
+        reset_search_backend()
+        backend = get_search_backend()
+        backend.create_index = lambda *a, **kw: (_ for _ in ()).throw(SearchBackendError("connection refused"))
+
+        with pytest.raises(SearchBackendError):
+            create_index("broken")
+
+        log = IndexSyncLog.objects.filter(action="created").first()
+        assert log is not None
+        assert log.status == "failed"
+        assert SearchIndex.objects.filter(name="broken").exists()
 
 
 class TestDeleteIndex:

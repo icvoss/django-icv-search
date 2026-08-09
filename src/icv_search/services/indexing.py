@@ -9,7 +9,7 @@ from typing import Any
 from django.utils import timezone
 
 from icv_search.backends import get_search_backend
-from icv_search.exceptions import SearchBackendError
+from icv_search.exceptions import IndexNotFoundError, SearchBackendError
 from icv_search.models import IndexSyncLog, SearchIndex
 from icv_search.services._utils import resolve_index
 from icv_search.signals import search_index_created, search_index_deleted, search_index_synced
@@ -139,14 +139,65 @@ def create_index(
         primary_key_field=primary_key,
         settings=merged_settings,
     )
-    index.save()
+    # engine_uid is normally computed inside SearchIndex.save(); compute it
+    # here too so backend.create_index() below can run before index.save().
+    index.engine_uid = index._compute_engine_uid()  # noqa: SLF001 (same-package coupling by design)
 
     backend = get_search_backend()
+
+    # Provision the engine-side index BEFORE saving the Django row (#10).
+    # index.save() fires post_save, which (when ICV_SEARCH_AUTO_SYNC is on
+    # and ICV_SEARCH_ASYNC_INDEXING is off, the default synchronous path)
+    # calls backend.update_settings() synchronously via the signal handler.
+    # For PostgresBackend, update_settings() raises IndexNotFoundError when
+    # no icv_search_index_meta row exists yet for the uid, which is always
+    # true on the very first save for a new index name. Calling
+    # backend.create_index() first means the metadata row already exists by
+    # the time the post_save signal runs update_settings(), so the
+    # signal-driven sync succeeds instead of racing the row it depends on.
+    # backend.create_index() is idempotent (ON CONFLICT DO UPDATE for
+    # PostgresBackend; engine-native upsert semantics for other backends),
+    # so calling it before the SearchIndex row exists is safe.
+    #
+    # A create_index() failure here must still result in a saved SearchIndex
+    # row and a "failed" IndexSyncLog entry (BR-007: every backend operation
+    # is logged), so the failure is captured rather than raised immediately;
+    # index.save() and the log entry always happen below, and the captured
+    # error is what ultimately gets raised.
+    create_result: dict[str, Any] | None = None
+    create_error: SearchBackendError | None = None
+    try:
+        create_result = backend.create_index(uid=index.engine_uid, primary_key=primary_key)
+    except SearchBackendError as exc:
+        create_error = exc
+        logger.exception("Failed to create search index '%s' in engine.", name)
+
+    # If create_index() already failed, the engine-side index does not
+    # exist, so the auto-sync post_save signal's synchronous
+    # update_settings() call would raise too. For PostgresBackend this is
+    # IndexNotFoundError (no icv_search_index_meta row yet); other backends
+    # may raise SearchBackendError instead. Either way this second, expected
+    # failure must not pre-empt the "failed" IndexSyncLog entry below, so it
+    # is swallowed here; the original create_index() error is what gets
+    # raised and logged.
+    try:
+        index.save()
+    except (SearchBackendError, IndexNotFoundError):
+        if create_error is None:
+            raise
+        logger.exception(
+            "Auto-sync also failed while saving search index '%s' after create_index() failed.",
+            name,
+        )
+
     log = IndexSyncLog.objects.create(index=index, action="created", status="pending")
 
+    if create_error is not None:
+        log.mark_complete(status="failed", detail=str(create_error))
+        raise create_error
+
     try:
-        raw_result = backend.create_index(uid=index.engine_uid, primary_key=primary_key)
-        task_result = TaskResult.from_engine(raw_result)
+        task_result = TaskResult.from_engine(create_result)
         log.task_uid = task_result.task_uid
 
         if merged_settings:
