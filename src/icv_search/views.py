@@ -9,6 +9,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_GET, require_POST
 
 from icv_search.backends import get_search_backend
+from icv_search.middleware import get_current_tenant_id
 
 _MAX_FIELD_LENGTH = 500
 _MAX_METADATA_BYTES = 10240  # 10 KB
@@ -36,13 +37,25 @@ def icv_search_health(request):
 
 @require_POST
 @csrf_exempt  # Intentional: this endpoint is called by client-side JS on search result pages.
-# Rate limiting should be configured at the reverse proxy layer.
+# Rate limiting is not implemented in this package and must be configured at
+# the reverse proxy layer or added via a project-level middleware/decorator
+# in front of this view. This is a deliberate deployment responsibility, not
+# an oversight: a shared library should not impose a rate-limit backend
+# (cache, Redis, etc.) on every consumer. See 04-interfaces.md "Click
+# Tracking Endpoint" for the documented expectation.
 def icv_search_click(request):
     """Record a search result click event.
 
     Accepts JSON with ``index_name``, ``query``, ``document_id``, and
     ``position``. Returns 204 on success, 400 on validation error, or 403
     when click tracking is disabled.
+
+    Tenant attribution for the logged click is always derived server-side
+    from :func:`icv_search.middleware.get_current_tenant_id` (populated by
+    :class:`icv_search.middleware.ICVSearchTenantMiddleware`), never from
+    the request body. This endpoint is CSRF-exempt and publicly reachable;
+    trusting a client-supplied tenant identifier would let any caller
+    attribute click events to an arbitrary tenant.
     """
     from django.conf import settings as django_settings
 
@@ -84,12 +97,18 @@ def icv_search_click(request):
 
     from icv_search.services.click_tracking import log_click
 
+    # Tenant attribution is derived server-side from the trusted request
+    # context (ICVSearchTenantMiddleware / ICV_SEARCH_TENANT_PREFIX_FUNC),
+    # never from client-supplied JSON. This endpoint is CSRF-exempt and
+    # publicly reachable, so a client-controlled "tenant_id" field would let
+    # any caller attribute click events to an arbitrary tenant. Any
+    # "tenant_id" present in the request body is silently ignored.
     log_click(
         index_name=data["index_name"],
         query=data["query"],
         document_id=str(data["document_id"]),
         position=position,
-        tenant_id=data.get("tenant_id", ""),
+        tenant_id=get_current_tenant_id(),
         metadata=metadata or None,
     )
 
