@@ -328,6 +328,19 @@ class TestPostgresBackendSearchFullText:
         result = pg_backend.search("open", "unique")
         assert result["estimatedTotalHits"] == 1
 
+    def test_add_documents_builds_search_vector(self, pg_backend):
+        """add_documents should populate search_vector directly, not just via search behaviour."""
+        pg_backend.create_index("vectors")
+        pg_backend.add_documents("vectors", [{"id": "1", "title": "Django Framework"}])
+        with connection.cursor() as cursor:
+            cursor.execute(
+                f"SELECT search_vector FROM {_TABLE} WHERE index_uid = %s AND doc_id = %s",
+                ["vectors", "1"],
+            )
+            row = cursor.fetchone()
+        assert row is not None
+        assert row[0] is not None
+
 
 # ---------------------------------------------------------------------------
 # Search — pagination
@@ -424,6 +437,12 @@ class TestPostgresBackendSearchFiltering:
     def test_no_filter_returns_all(self):
         result = self.backend.search("products", "")
         assert result["estimatedTotalHits"] == 4
+
+    def test_filter_combines_string_and_boolean_fields(self):
+        """Multiple filter keys of different types should combine as AND."""
+        result = self.backend.search("products", "", filter={"category": "equipment", "is_active": False})
+        assert result["estimatedTotalHits"] == 1
+        assert result["hits"][0]["id"] == "3"
 
 
 # ---------------------------------------------------------------------------
@@ -523,6 +542,17 @@ class TestPostgresBackendTableBootstrap:
     def test_ensure_tables_is_idempotent(self, pg_backend):
         """Calling _ensure_tables again on an existing schema must not raise."""
         pg_backend._ensure_tables()
+
+    def test_creates_gin_and_btree_indexes_on_document_table(self, pg_backend):
+        """Backend should create a GIN index on search_vector and a B-tree index on index_uid."""
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "SELECT indexname FROM pg_indexes WHERE tablename = %s",
+                [_TABLE],
+            )
+            index_names = [row[0] for row in cursor.fetchall()]
+        assert any("search_vector" in name for name in index_names)
+        assert any("index_uid" in name for name in index_names)
 
 
 # ---------------------------------------------------------------------------
