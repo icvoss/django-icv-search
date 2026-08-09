@@ -9,7 +9,7 @@ from typing import Any
 from django.utils import timezone
 
 from icv_search.backends import get_search_backend
-from icv_search.exceptions import SearchBackendError
+from icv_search.exceptions import IndexNotFoundError, SearchBackendError
 from icv_search.models import IndexSyncLog, SearchIndex
 from icv_search.services._utils import resolve_index
 from icv_search.signals import search_index_created, search_index_deleted, search_index_synced
@@ -174,14 +174,15 @@ def create_index(
 
     # If create_index() already failed, the engine-side index does not
     # exist, so the auto-sync post_save signal's synchronous
-    # update_settings() call would raise too (for backends like
-    # PostgresBackend where update_settings() requires the index to
-    # already exist). That second, expected failure must not pre-empt the
-    # "failed" IndexSyncLog entry below, so it is swallowed here; the
-    # original create_index() error is what gets raised and logged.
+    # update_settings() call would raise too. For PostgresBackend this is
+    # IndexNotFoundError (no icv_search_index_meta row yet); other backends
+    # may raise SearchBackendError instead. Either way this second, expected
+    # failure must not pre-empt the "failed" IndexSyncLog entry below, so it
+    # is swallowed here; the original create_index() error is what gets
+    # raised and logged.
     try:
         index.save()
-    except SearchBackendError:
+    except (SearchBackendError, IndexNotFoundError):
         if create_error is None:
             raise
         logger.exception(

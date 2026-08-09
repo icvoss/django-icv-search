@@ -83,8 +83,15 @@ class TestDeleteDebouncing:
         settings.ICV_SEARCH_DEBOUNCE_SECONDS = 30
         index = create_index("articles")
 
-        for doc_id in ("1", "2", "3"):
-            _debounce_removal("articles", doc_id, 30)
+        # Buffering must not itself trigger a real flush: patch apply_async
+        # the same way test_multiple_deletes_within_window_buffer_into_one_task
+        # does, otherwise an unmocked call (no broker configured) raises,
+        # and _debounce_buffer_append's exception handler falls back to
+        # processing (and clearing) the buffer synchronously per item,
+        # leaving nothing buffered for flush_debounce_removal_buffer below.
+        with patch("icv_search.tasks.flush_debounce_removal_buffer.apply_async"):
+            for doc_id in ("1", "2", "3"):
+                _debounce_removal("articles", doc_id, 30)
 
         with patch("icv_search.services.documents.remove_documents") as mock_remove:
             result = flush_debounce_removal_buffer(str(index.pk))
