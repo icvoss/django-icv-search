@@ -74,7 +74,7 @@ class Command(BaseCommand):
                 clusters = cluster_queries(index_name, days=days, tenant_id=tenant_id)[:10]
                 synonyms = suggest_synonyms(index_name, days=days, tenant_id=tenant_id)
             except Exception:
-                pass  # pg_trgm not available — skip clustering and synonyms
+                pass  # pg_trgm not available, skip clustering and synonyms
 
             report = {
                 "index_name": index_name,
