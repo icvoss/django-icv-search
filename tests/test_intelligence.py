@@ -1,9 +1,11 @@
 """Tests for the search intelligence service module.
 
-Most tests use SQLite via the standard test database. Tests that exercise
-``cluster_queries`` and ``suggest_synonyms`` (which require PostgreSQL's
-``pg_trgm`` extension) are collected under a separate class and are skipped
-when PostgreSQL is not available.
+Most tests run against whichever database the test settings configure.
+Tests that exercise ``cluster_queries`` and ``suggest_synonyms`` (which
+require PostgreSQL's ``pg_trgm`` extension) are collected under a separate
+class and are skipped when PostgreSQL is not available. The ``pg_trgm``
+extension itself is created for the test database by the ``django_db_setup``
+fixture override in ``conftest.py``.
 """
 
 from __future__ import annotations
@@ -12,6 +14,7 @@ import datetime
 from unittest.mock import patch
 
 import pytest
+from django.db import connection
 
 from icv_search.services.intelligence import (
     auto_create_rewrites,
@@ -24,26 +27,50 @@ from icv_search.testing.factories import SearchQueryAggregateFactory
 # ---------------------------------------------------------------------------
 # PostgreSQL + pg_trgm availability check
 # ---------------------------------------------------------------------------
-
-
-def _pg_trgm_available() -> bool:
-    """Return True when running on PostgreSQL with pg_trgm installed."""
-    try:
-        from django.db import connection
-
-        if connection.vendor != "postgresql":
-            return False
-        with connection.cursor() as cursor:
-            cursor.execute("SELECT 1 FROM pg_extension WHERE extname = 'pg_trgm'")
-            return cursor.fetchone() is not None
-    except Exception:
-        return False
-
+#
+# The vendor check below is a plain attribute comparison (matches the
+# convention in test_postgres_backend.py) and is safe to evaluate at import
+# time: it does not open a cursor or touch a database connection.
+#
+# The pg_trgm-extension check is different: it has to run a query, so it
+# cannot run at import/collection time. Collection happens before
+# pytest-django creates the test database (typically ``test_<DB_NAME>``), so
+# a query at import time would run against the wrong database. Instead it
+# runs from the ``_pg_trgm_installed`` fixture below, applied to the two
+# classes that need it via ``usefixtures``. That fixture depends on ``db``,
+# which guarantees pytest-django has already created and connected to the
+# real test database. The extension itself is created by the
+# ``django_db_setup`` override in conftest.py, so by the time this fixture
+# runs pg_trgm should always be present when PostgreSQL is in use; if it is
+# genuinely missing (or the query fails for any other reason) that error is
+# allowed to propagate rather than being swallowed into a silent skip.
 
 _requires_postgres = pytest.mark.skipif(
-    not _pg_trgm_available(),
-    reason="pg_trgm tests require PostgreSQL with the pg_trgm extension installed",
+    connection.vendor != "postgresql",
+    reason="pg_trgm tests require a PostgreSQL database",
 )
+
+
+@pytest.fixture()
+def _pg_trgm_installed(db):
+    """Confirm ``pg_trgm`` is installed before a pg_trgm-only test runs.
+
+    Used explicitly (not module-wide autouse) by the two classes below that
+    exercise ``cluster_queries``/``suggest_synonyms``, since those are the
+    only tests in this module that actually require the extension.
+    """
+    if connection.vendor != "postgresql":
+        return
+    with connection.cursor() as cursor:
+        cursor.execute("SELECT 1 FROM pg_extension WHERE extname = 'pg_trgm'")
+        if cursor.fetchone() is None:
+            pytest.fail(
+                "PostgreSQL is available but the pg_trgm extension is not installed. "
+                "It should have been created by the django_db_setup fixture in "
+                "conftest.py; check that the test database user has permission to "
+                "run CREATE EXTENSION."
+            )
+
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -309,6 +336,7 @@ class TestGetDemandSignals:
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.usefixtures("_pg_trgm_installed")
 class TestClusterQueriesPgTrgm:
     """Tests for cluster_queries(). Skipped when PostgreSQL is unavailable."""
 
@@ -414,6 +442,7 @@ class TestClusterQueriesPgTrgm:
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.usefixtures("_pg_trgm_installed")
 class TestSuggestSynonymsPgTrgm:
     """Tests for suggest_synonyms(). Skipped when PostgreSQL is unavailable."""
 
