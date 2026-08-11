@@ -37,7 +37,6 @@ except ImportError:
 
         class Meta:
             abstract = True
-            ordering = ["-created_at"]
 
 
 __all__ = ["BaseModel"]

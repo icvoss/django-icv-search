@@ -4,6 +4,16 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Changed
+
+- **Behaviour changing:** the bundled fallback `BaseModel` (used when
+  django-icv-core is not installed) no longer sets a default
+  `Meta.ordering` (ADR-066). A `Meta.ordering` on a shared base defeats
+  `values()`/`values_list()` combined with `distinct()` in every inheriting
+  model. Every concrete model in this package already declares its own
+  explicit `ordering`, so no model loses its current sort order and no
+  compensating changes were needed.
+
 ### Fixed
 
 - `icv_search_intelligence --all-indexes` built its index list with
