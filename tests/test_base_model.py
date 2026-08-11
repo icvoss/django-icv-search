@@ -128,8 +128,8 @@ class TestBaseModelFallback:
             sys.modules.clear()
             sys.modules.update(original_modules)
 
-    def test_fallback_base_model_has_default_ordering(self):
-        """Fallback BaseModel should order by -created_at by default."""
+    def test_fallback_base_model_has_no_default_ordering(self):
+        """Fallback BaseModel should not impose a default ordering (ADR-066)."""
         import sys
 
         original_modules = sys.modules.copy()
@@ -147,7 +147,7 @@ class TestBaseModelFallback:
             importlib.reload(base)
             BaseModel = base.BaseModel
 
-            assert BaseModel._meta.ordering == ["-created_at"]
+            assert BaseModel._meta.ordering == []
 
         finally:
             sys.modules.clear()
