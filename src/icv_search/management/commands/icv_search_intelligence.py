@@ -45,9 +45,7 @@ class Command(BaseCommand):
 
         if options["all_indexes"]:
             indexes = list(
-                SearchQueryAggregate.objects.order_by("index_name")
-                .values_list("index_name", flat=True)
-                .distinct()
+                SearchQueryAggregate.objects.order_by("index_name").values_list("index_name", flat=True).distinct()
             )
             if not indexes:
                 raise CommandError("No index names found in SearchQueryAggregate.")
