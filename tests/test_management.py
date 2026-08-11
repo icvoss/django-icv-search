@@ -1,6 +1,8 @@
 """Tests for icv-search management commands."""
 
+import datetime
 from io import StringIO
+from unittest.mock import patch
 
 import pytest
 from django.core.management import call_command
@@ -10,7 +12,7 @@ from icv_search.backends import reset_search_backend
 from icv_search.backends.dummy import DummyBackend, _indexes
 from icv_search.models import SearchIndex
 from icv_search.services import create_index, index_documents
-from icv_search.testing.factories import SearchIndexFactory
+from icv_search.testing.factories import SearchIndexFactory, SearchQueryAggregateFactory
 
 
 @pytest.fixture(autouse=True)
@@ -136,6 +138,97 @@ class TestIcvSearchClearCommand:
         out = StringIO()
         call_command("icv_search_clear", "--index=articles", stdout=out)
         assert "Cleared" in out.getvalue()
+
+
+class TestIcvSearchIntelligenceCommand:
+    """icv_search_intelligence management command.
+
+    Regression coverage for the ``--all-indexes`` distinct-index defect:
+    ``SearchQueryAggregate.objects.values_list("index_name", flat=True).distinct()``
+    without ``.order_by()`` first inherits ``Meta.ordering = ["-date"]``, so
+    Django appends ``date`` to the SELECT and DISTINCT applies to
+    ``(index_name, date)`` instead of ``index_name`` alone. One index with
+    rows on several aggregate dates then yields one list entry PER DATE, and
+    the intelligence pass (including the expensive pg_trgm-backed
+    ``cluster_queries``/``suggest_synonyms`` calls) re-runs once per date
+    per index instead of once per index.
+    """
+
+    @pytest.mark.django_db
+    def test_all_indexes_runs_intelligence_once_per_distinct_index(self):
+        """One index with rows on two different dates must trigger exactly one pass.
+
+        Pre-fix: ``values_list(...).distinct()`` (no ``order_by()``) applies
+        DISTINCT to ``(index_name, date)`` because of the inherited
+        ``Meta.ordering = ["-date"]``, so with two aggregate dates the loop
+        body runs twice for the same index. This test fails before the fix
+        (call_count == 2) and passes after it (call_count == 1).
+        """
+        today = datetime.date.today()
+        yesterday = today - datetime.timedelta(days=1)
+
+        # A single index_name, with aggregate rows on two distinct dates.
+        SearchQueryAggregateFactory(index_name="products", query="shoes", date=today)
+        SearchQueryAggregateFactory(index_name="products", query="boots", date=yesterday)
+
+        with (
+            patch(
+                "icv_search.services.analytics.get_popular_queries",
+                return_value=[],
+            ) as mock_popular,
+            patch(
+                "icv_search.services.analytics.get_zero_result_queries",
+                return_value=[],
+            ) as mock_zero_result,
+            patch(
+                "icv_search.services.intelligence.get_demand_signals",
+                return_value=[],
+            ) as mock_demand,
+        ):
+            out = StringIO()
+            call_command("icv_search_intelligence", "--all-indexes", stdout=out)
+
+        # Behavioural: the command completes and reports the single index once.
+        output = out.getvalue()
+        assert output.count("Search Intelligence Report: products") == 1
+
+        # Each intelligence entry point is called exactly once per distinct
+        # index, never once per (index, date) pair.
+        assert mock_popular.call_count == 1
+        assert mock_zero_result.call_count == 1
+        assert mock_demand.call_count == 1
+
+    @pytest.mark.django_db
+    def test_all_indexes_covers_every_distinct_index(self):
+        """Multiple distinct indexes are each still reported exactly once."""
+        today = datetime.date.today()
+        yesterday = today - datetime.timedelta(days=1)
+
+        SearchQueryAggregateFactory(index_name="products", query="shoes", date=today)
+        SearchQueryAggregateFactory(index_name="products", query="boots", date=yesterday)
+        SearchQueryAggregateFactory(index_name="articles", query="news", date=today)
+
+        with (
+            patch(
+                "icv_search.services.analytics.get_popular_queries",
+                return_value=[],
+            ) as mock_popular,
+            patch(
+                "icv_search.services.analytics.get_zero_result_queries",
+                return_value=[],
+            ),
+            patch(
+                "icv_search.services.intelligence.get_demand_signals",
+                return_value=[],
+            ),
+        ):
+            out = StringIO()
+            call_command("icv_search_intelligence", "--all-indexes", stdout=out)
+
+        output = out.getvalue()
+        assert output.count("Search Intelligence Report: products") == 1
+        assert output.count("Search Intelligence Report: articles") == 1
+        assert mock_popular.call_count == 2  # once per distinct index (products, articles)
 
 
 class TestIcvSearchSyncCommand:

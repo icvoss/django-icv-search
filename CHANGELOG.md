@@ -2,6 +2,20 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+### Fixed
+
+- `icv_search_intelligence --all-indexes` built its index list with
+  `SearchQueryAggregate.objects.values_list("index_name", flat=True).distinct()`.
+  `SearchQueryAggregate.Meta.ordering = ["-date"]` made Django append `date`
+  to the SELECT, so DISTINCT applied to `(index_name, date)` rather than
+  `index_name` alone: an index with rows on several aggregate dates produced
+  one list entry per date, and the whole intelligence pass (including the
+  pg_trgm-backed `cluster_queries`/`suggest_synonyms` calls) re-ran once per
+  date per index. The query now clears ordering with `.order_by()` before
+  `.distinct()` so each index is reported exactly once.
+
 ## [1.2.3] - 2026-08-09
 
 ### Fixed
