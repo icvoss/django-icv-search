@@ -84,8 +84,6 @@ jobs:
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
-        ports:
-          - 5432:5432
 
     steps:
       - uses: actions/checkout@v6
@@ -112,7 +110,7 @@ jobs:
           DB_USER: icv_test
           DB_PASSWORD: icv_test_password
           DB_HOST: localhost
-          DB_PORT: "5432"
+          DB_PORT: ${{ job.services.postgres.ports['5432'] }}
 
   # 3. Build wheel and sdist
   build:
