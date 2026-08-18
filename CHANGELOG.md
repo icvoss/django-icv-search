@@ -4,6 +4,11 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- **Django 6.1 added to the CI test matrix** and declared via the
+  `Framework :: Django :: 6.1` classifier.
+
 ### Changed
 
 - **Behaviour changing:** the bundled fallback `BaseModel` (used when
