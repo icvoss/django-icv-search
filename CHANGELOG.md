@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [1.2.4] - 2026-08-19
+
 ### Added
 
 - **Django 6.1 added to the CI test matrix** and declared via the
