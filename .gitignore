@@ -22,3 +22,9 @@ venv/
 
 # Claude Code framework and worktrees
 .claude/
+
+# uv lockfile: not tracked in a library. Consumers resolve from the
+# constraints in pyproject.toml, so a committed lock binds nobody and only
+# adds churn. Applications and deployed sites commit it instead.
+# Ruling: icvoss/icv-oss-umbrella#368, template in templates/repo/gitignore.
+uv.lock
