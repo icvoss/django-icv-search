@@ -4,6 +4,36 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Changed
+
+- **`tenant_id` on `SearchQueryLog` and `SearchClick` is now documented as
+  advisory, not an isolation boundary** (#30). Its `help_text` previously read
+  "Tenant identifier for multi-tenant setups", which reads as an assurance.
+  It is a plain indexed string with no foreign key and no constraint; this
+  package ships no custom manager, so nothing filters it by default. The
+  service-layer analytics functions filter by it only when a caller passes a
+  non-empty value and **fail open** when it is omitted, returning every
+  tenant's rows.
+
+  Documentation only: no field, migration or behaviour changes. The
+  `help_text`, both model docstrings and the README's "Multi-Tenancy" section
+  now state the limitation, and distinguish it from
+  `ICV_SEARCH_TENANT_PREFIX_FUNC`, which prefixes **index names** and does
+  isolate. The README also records that retention is time-based only, with no
+  per-user or per-tenant erasure path.
+
+  **For consumers:** nothing to change. If you relied on the previous wording
+  to mean these rows were tenant-isolated, they were not, and you should
+  enforce scoping in your own project.
+
+### Added
+
+- `tests/test_tenant_id_is_advisory.py`, pinning the documented behaviour so
+  the docs cannot drift from the code: the absence of a custom manager, the
+  absence of an FK or constraint, the fail-open filtering, and the presence of
+  the caveat wording itself. If real scoping is added later these fail, which
+  is the prompt to update the documentation in the same pass.
+
 ## [1.3.0] - 2026-08-19
 
 ### Added

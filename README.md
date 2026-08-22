@@ -79,7 +79,9 @@ Search for Django without the lock-in. Point it at Meilisearch, PostgreSQL, or y
 - Gated behind `ICV_SEARCH_MERCHANDISING_ENABLED`; when disabled, `merchandised_search()` delegates directly to `search()`
 
 ### Infrastructure
-- Multi-tenancy: tenant-prefixed index names via a configurable callable; no coupling to any tenant model
+- Multi-tenancy: tenant-prefixed index names via a configurable callable; no coupling to any tenant model.
+  Note this prefixes **index names** only. The `tenant_id` column on the analytics models is a separate,
+  advisory mechanism with no isolation guarantee: see "Multi-Tenancy" below.
 - Result caching via Django's cache framework; automatic invalidation on index changes
 - Health check endpoint (`/health/`) for load balancer probes
 - Django signals for index lifecycle events (`search_index_created`, `documents_indexed`, etc.)
@@ -1833,6 +1835,30 @@ class ArticleFactory(factory.django.DjangoModelFactory):
 ## Multi-Tenancy
 
 Tenant-prefixed index names via a configurable callable. No foreign key to a tenant model: no coupling to any specific tenant implementation.
+
+> **Two separate mechanisms, and only one of them isolates anything.**
+>
+> `ICV_SEARCH_TENANT_PREFIX_FUNC`, documented here, prefixes **index names**.
+> Two tenants get two indexes, so a search cannot return the other tenant's
+> documents.
+>
+> The `tenant_id` column on `SearchQueryLog` and `SearchClick` is a different
+> thing and is **advisory only**. It is a plain indexed string with no foreign
+> key and no constraint, nothing validates it, and this package ships no
+> custom manager, so nothing filters it by default. The service-layer
+> analytics functions accept a `tenant_id` argument and filter by it, but they
+> **fail open**: called without one (the default is `""`), they return every
+> tenant's rows. Code reaching those models directly is unscoped entirely.
+>
+> Those rows hold end-user data, including the verbatim query string, an
+> optional FK to `AUTH_USER_MODEL` on `SearchQueryLog`, and a free-form
+> `metadata` JSON field. If you need real isolation on them, enforce it in
+> your own project: a manager of your own, or scoping at every call site.
+>
+> Retention is time-based only (`cleanup_search_query_logs`, default 30 days;
+> `icv_search_click_aggregate --delete` for clicks). **There is no per-user or
+> per-tenant erasure path**, so a subject erasure request is not satisfiable
+> by anything this package ships today.
 
 ```python
 # myproject/search.py

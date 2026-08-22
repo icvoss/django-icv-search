@@ -15,6 +15,29 @@ class SearchQueryLog(BaseModel):
     When ``ICV_SEARCH_LOG_QUERIES`` is ``True`` the :func:`~icv_search.services.search`
     function creates one record per call.  Set ``ICV_SEARCH_LOG_ZERO_RESULTS_ONLY``
     to ``True`` to limit storage to queries that returned no hits.
+
+    .. warning::
+
+       Rows here hold end-user data: the verbatim ``query`` string, an
+       optional FK to ``AUTH_USER_MODEL``, and a free-form ``metadata`` JSON
+       field whose own help text invites session identifiers.
+
+       ``tenant_id`` is an **advisory label, not an isolation boundary**. It
+       is a plain string with no FK and no constraint; this package ships no
+       custom manager, so nothing filters it by default. The service-layer
+       analytics functions filter by it only when the caller passes a
+       non-empty value and **fail open** when it is omitted, returning every
+       tenant's rows. Anything reaching this model directly is unscoped.
+
+       A consumer needing real isolation must enforce it themselves, for
+       example with a manager of their own or by scoping every call site.
+       ``ICV_SEARCH_TENANT_PREFIX_FUNC``, which the README describes under
+       "Multi-tenancy", prefixes **index names** and is a genuinely separate
+       mechanism from this column; do not read the one as covering the other.
+
+       Retention is time-based only (``cleanup_search_query_logs``, default 30
+       days). There is no per-user or per-tenant erasure path, so a subject
+       erasure request is not satisfiable by anything this package ships.
     """
 
     index_name = models.CharField(
@@ -65,7 +88,16 @@ class SearchQueryLog(BaseModel):
         blank=True,
         db_index=True,
         verbose_name=_("tenant ID"),
-        help_text=_("Tenant identifier for multi-tenant setups."),
+        help_text=_(
+            "Advisory tenant label. NOT an isolation boundary: it is a plain "
+            "indexed string with no foreign key and no constraint, nothing "
+            "validates it, and no manager filters on it. The service-layer "
+            "analytics functions filter by it only when a caller passes a "
+            "non-empty tenant_id, and they FAIL OPEN when it is omitted, "
+            "returning every tenant's rows. A caller reaching these models "
+            "directly is unscoped entirely. Treat it as a grouping label for "
+            "reporting, never as a security control."
+        ),
     )
     is_zero_result = models.BooleanField(
         default=False,
