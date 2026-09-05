@@ -55,3 +55,38 @@ def _reset_dummy_backend():
     yield
     DummyBackend.reset()
     reset_search_backend()
+
+
+def _reload_conf_on_setting_changed(*, setting, **kwargs):
+    """Reload ``icv_search.conf`` whenever a setting it resolves reverts.
+
+    ``icv_search.conf`` reads ``ICV_AUTH_USER_MODEL``, ``ICV_CACHES_ALIAS``,
+    and other ADR-037 fleet-global settings as module-level constants at
+    import time. A test overriding one via the pytest-django ``settings``
+    fixture (or ``override_settings``) must reload ``conf`` to observe the
+    override, and must reload it again once the override reverts, or the
+    module constant stays pinned to the overridden value and poisons every
+    later test that reads it without reloading first.
+
+    A ``finally: importlib.reload(conf)`` inside the test body cannot do the
+    second reload correctly: the ``settings`` fixture (and
+    ``override_settings``) only revert ``django.conf.settings`` *after* the
+    test body has returned, so a reload placed there fires too early, while
+    the override is still live. Django's ``setting_changed`` signal, by
+    contrast, is sent by both mechanisms at the moment they actually apply
+    or revert a value, which is exactly when ``conf`` needs reloading.
+    Connected once, for the settings this package's ``conf`` module
+    resolves; harmless (and cheap) for every other setting change.
+    """
+    if setting not in {"ICV_AUTH_USER_MODEL", "ICV_CACHES_ALIAS", "AUTH_USER_MODEL"}:
+        return
+    import importlib
+
+    from icv_search import conf
+
+    importlib.reload(conf)
+
+
+from django.test.signals import setting_changed  # noqa: E402
+
+setting_changed.connect(_reload_conf_on_setting_changed)

@@ -6,9 +6,28 @@ Consuming projects override in their Django settings file.
 
 Usage:
     from icv_search.conf import ICV_SEARCH_BACKEND
+
+Two settings here are fleet-global rather than package-scoped (ADR-037):
+``ICV_AUTH_USER_MODEL`` (falls back to ``settings.AUTH_USER_MODEL``) is the
+model every icv package's user FK targets, and ``ICV_CACHES_ALIAS`` (falls
+back to ``"default"``) is the cache alias every icv package caches through.
+Both are read here, once, at import time, matching the module-constant style
+already used throughout this file. ``ICV_SEARCH_CACHE_ALIAS`` stays as a
+package-scoped override (ADR-037 second amendment, ruling 2): the search
+result cache is deliberately separately evictable from other icv caches, so
+a consumer can flush search results without touching the fleet cache. Its
+default chains onto the resolved ``ICV_CACHES_ALIAS`` rather than the
+literal ``"default"``, so a consumer who only sets ``ICV_CACHES_ALIAS``
+still gets search results cached through it.
 """
 
 from django.conf import settings
+
+# Fleet-global (ADR-037): the model every icv package's user FK targets.
+ICV_AUTH_USER_MODEL: str = getattr(settings, "ICV_AUTH_USER_MODEL", settings.AUTH_USER_MODEL)
+
+# Fleet-global (ADR-037): the cache alias every icv package caches through.
+ICV_CACHES_ALIAS: str = getattr(settings, "ICV_CACHES_ALIAS", "default")
 
 # Dotted path to the search backend class
 ICV_SEARCH_BACKEND: str = getattr(settings, "ICV_SEARCH_BACKEND", "icv_search.backends.meilisearch.MeilisearchBackend")
@@ -141,9 +160,11 @@ ICV_SEARCH_CACHE_ENABLED: bool = getattr(settings, "ICV_SEARCH_CACHE_ENABLED", F
 ICV_SEARCH_CACHE_TIMEOUT: int = getattr(settings, "ICV_SEARCH_CACHE_TIMEOUT", 60)
 
 # Django cache alias used by the search result cache.
-# Defaults to "default". Set to a dedicated alias (e.g. "search") when
-# you want to control eviction independently from other cached data.
-ICV_SEARCH_CACHE_ALIAS: str = getattr(settings, "ICV_SEARCH_CACHE_ALIAS", "default")
+# Defaults to the resolved ICV_CACHES_ALIAS (ADR-037 second amendment, ruling
+# 2: a documented, separately evictable result cache). Set to a dedicated
+# alias (e.g. "search") when you want to control eviction independently from
+# other icv caches.
+ICV_SEARCH_CACHE_ALIAS: str = getattr(settings, "ICV_SEARCH_CACHE_ALIAS", ICV_CACHES_ALIAS)
 
 # Enable the merchandising layer (query redirects, rewrites, pins, boosts,
 # banners, zero-result fallbacks). When False (the default), merchandised_search()

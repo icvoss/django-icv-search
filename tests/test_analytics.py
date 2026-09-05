@@ -1031,3 +1031,41 @@ class TestSearchQueryAggregateModel:
         assert "shoes" in s
         assert "products" in s
         assert "2026-03-22" in s
+
+
+class TestSearchQueryLogUserFkFollowsIcvAuthUserModel:
+    """SearchQueryLog.user targets the resolved ICV_AUTH_USER_MODEL (ADR-037),
+    not settings.AUTH_USER_MODEL directly."""
+
+    def test_deconstructs_to_settings_auth_user_model_when_unset(self, settings):
+        """With ICV_AUTH_USER_MODEL unset, the FK must still deconstruct to
+        settings.AUTH_USER_MODEL so shipped migrations stay byte-stable
+        (ADR-037, 'Migration-state consequence')."""
+        from icv_search.models.analytics import SearchQueryLog
+
+        assert not hasattr(settings, "ICV_AUTH_USER_MODEL")
+        field = SearchQueryLog._meta.get_field("user")
+        _, _, _, kwargs = field.deconstruct()
+        # ForeignKey.deconstruct() always lowercases the "to" reference
+        # (Django's own migration-serialisation convention, unrelated to
+        # ADR-037), so compare case-insensitively.
+        assert kwargs["to"] == settings.AUTH_USER_MODEL.lower()
+
+    def test_conf_resolves_to_the_override_when_set(self, settings):
+        """icv_search.conf.ICV_AUTH_USER_MODEL (what the field is built from
+        at model-import time) honours an explicit override.
+
+        Cleanup relies on the ``setting_changed`` signal handler in
+        ``conftest.py``, which reloads ``conf`` whenever
+        ``ICV_AUTH_USER_MODEL`` reverts (a ``finally: importlib.reload(conf)``
+        here would reload it too early, while the override is still live per
+        the ``settings`` fixture's own teardown timing, and leak the value
+        into later tests).
+        """
+        import importlib
+
+        from icv_search import conf
+
+        settings.ICV_AUTH_USER_MODEL = "auth.User"
+        importlib.reload(conf)
+        assert conf.ICV_AUTH_USER_MODEL == "auth.User"

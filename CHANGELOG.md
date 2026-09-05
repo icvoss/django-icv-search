@@ -4,7 +4,49 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Fixed
+
+- **Shipped the migration #31 forgot** (issue #36). The `help_text` on
+  `SearchClick.tenant_id` and `SearchQueryLog.tenant_id` changed in 1.3.0
+  without a migration, so any consumer running `makemigrations --check`
+  with this package installed failed it, and plain `makemigrations`
+  generated the package's migration into the consumer's own project.
+  Migration `0007_tenant_id_help_text` carries the two `AlterField`
+  operations; it is state-only (no schema change) and must be applied on
+  upgrade. CI still has no gate that exercises the real migration graph;
+  that half of #36 stays open.
+
 ### Changed
+
+- **Adopted ADR-037's fleet-global settings for the user FK and cache
+  routing** (issue #33). Two new settings are honoured, both falling back to
+  existing behaviour when unset:
+
+  - `ICV_AUTH_USER_MODEL` (falls back to `settings.AUTH_USER_MODEL`):
+    `SearchQueryLog.user` now targets this resolved model instead of reading
+    `settings.AUTH_USER_MODEL` directly. With the override unset, the FK
+    still deconstructs to `settings.AUTH_USER_MODEL`, so shipped migrations
+    stay byte-stable; no new migration is generated.
+  - `ICV_CACHES_ALIAS` (falls back to `"default"`): the debounce buffers
+    (`auto_index.py`, `tasks.py`) and the merchandising rule cache
+    (`merchandising_cache.py`) now cache through this alias instead of
+    Django's bare default-alias `cache` object.
+
+  `ICV_SEARCH_CACHE_ALIAS` (the search result cache's own alias) is
+  unchanged as a setting and is **not** renamed or deprecated: it stays
+  package-scoped because the result cache is deliberately separately
+  evictable from other icv caches (ADR-037 second amendment, ruling 2). Its
+  default changes from the literal `"default"` to the resolved
+  `ICV_CACHES_ALIAS`.
+
+  **For consumers:** if you already set `ICV_SEARCH_CACHE_ALIAS` explicitly,
+  nothing changes. If you set `ICV_CACHES_ALIAS` fleet-wide but left
+  `ICV_SEARCH_CACHE_ALIAS` unset, search results now cache through
+  `ICV_CACHES_ALIAS` instead of Django's `"default"` alias; if that alias
+  does not exist in your `CACHES`, configure it or set
+  `ICV_SEARCH_CACHE_ALIAS` explicitly. Debounce buffering and merchandising
+  rule caching move the same way. If neither setting is set, behaviour is
+  unchanged.
 
 - **`tenant_id` on `SearchQueryLog` and `SearchClick` is now documented as
   advisory, not an isolation boundary** (#30). Its `help_text` previously read
@@ -28,6 +70,12 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- `tests/test_conf_adr037.py`, pinning `ICV_AUTH_USER_MODEL` and
+  `ICV_CACHES_ALIAS` resolution, and `ICV_SEARCH_CACHE_ALIAS` chaining onto
+  the resolved `ICV_CACHES_ALIAS`. Extended `tests/test_analytics.py`,
+  `tests/test_debounce.py` and `tests/test_merchandising_cache.py` with
+  driving tests that the FK and the three cache call sites actually honour
+  the new settings, not just that `conf.py` resolves them.
 - `tests/test_tenant_id_is_advisory.py`, pinning the documented behaviour so
   the docs cannot drift from the code: the absence of a custom manager, the
   absence of an FK or constraint, the fail-open filtering, and the presence of

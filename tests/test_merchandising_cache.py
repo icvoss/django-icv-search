@@ -14,6 +14,7 @@ from django.core.cache import cache as django_cache
 from django.utils import timezone
 
 from icv_search.merchandising_cache import (
+    _get_cache,
     get_matching_rules,
     invalidate_rules,
     load_rules,
@@ -233,3 +234,56 @@ class TestGetMatchingRules:
         rule = _redirect(query_pattern="shoes", match_type="exact")
         results = get_matching_rules(QueryRedirect, "QueryRedirect", "products", "  SHOES  ")
         assert any(r.pk == rule.pk for r in results)
+
+
+# ---------------------------------------------------------------------------
+# _get_cache() honours ICV_CACHES_ALIAS (ADR-037)
+# ---------------------------------------------------------------------------
+
+
+class TestGetCacheHonoursCachesAlias:
+    """_get_cache() resolves through ICV_CACHES_ALIAS, not the default alias.
+
+    ``_get_cache()`` does ``from icv_search.conf import ICV_CACHES_ALIAS``
+    inside its own body, which re-reads ``icv_search.conf``'s current module
+    attribute on every call rather than ``django.conf.settings`` directly.
+    ``conf`` resolves that attribute once, at its own import time, so a test
+    overriding ``settings.ICV_CACHES_ALIAS`` must reload ``conf`` before
+    calling ``_get_cache()`` for the override to be visible.
+    """
+
+    def test_writes_land_in_the_aliased_cache(self, settings):
+        """Pointing ICV_CACHES_ALIAS at a second configured cache moves
+        merchandising rule caching there, leaving the default alias untouched."""
+        settings.CACHES = {
+            "default": {
+                "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+                "LOCATION": "default-alias",
+            },
+            "fleet": {
+                "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+                "LOCATION": "fleet-alias",
+            },
+        }
+        settings.ICV_CACHES_ALIAS = "fleet"
+        import importlib
+
+        from icv_search import conf
+
+        importlib.reload(conf)
+
+        cache = _get_cache()
+        cache.set("adr037-probe", "value")
+
+        assert cache.get("adr037-probe") == "value"
+        assert django_cache.get("adr037-probe") is None
+
+    def test_defaults_to_the_default_alias_when_unset(self, settings):
+        """With ICV_CACHES_ALIAS unset, _get_cache() still resolves to the
+        default alias (unchanged behaviour)."""
+        assert not hasattr(settings, "ICV_CACHES_ALIAS")
+
+        cache = _get_cache()
+        cache.set("adr037-probe-default", "value")
+
+        assert django_cache.get("adr037-probe-default") == "value"
