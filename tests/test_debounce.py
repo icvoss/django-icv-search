@@ -240,3 +240,96 @@ class TestDebounceFlushChunking:
 
         assert result == 0
         mock_index.assert_not_called()
+
+
+# ===========================================================================
+# ADR-037: debounce buffers are cached through ICV_CACHES_ALIAS
+# ===========================================================================
+
+
+class TestDebounceBufferHonoursCachesAlias:
+    """The debounce buffer (save and delete sides) writes through the
+    resolved ICV_CACHES_ALIAS, not the default-alias cache object, so a
+    consumer routing icv packages through a non-default cache also gets
+    debounce buffering there."""
+
+    @pytest.mark.django_db
+    def test_save_side_buffer_lands_in_the_aliased_cache(self, settings):
+        settings.CACHES = {
+            "default": {
+                "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+                "LOCATION": "default-alias",
+            },
+            "fleet": {
+                "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+                "LOCATION": "fleet-alias",
+            },
+        }
+        settings.ICV_CACHES_ALIAS = "fleet"
+        settings.ICV_SEARCH_DEBOUNCE_SECONDS = 30
+        index = create_index("articles")
+
+        from django.core.cache import caches
+
+        with patch("icv_search.tasks.flush_debounce_buffer.apply_async"):
+            _debounce_document("articles", {"id": "1"}, 30)
+
+        buffer_key = f"icv_search:debounce:{index.pk}"
+        assert caches["fleet"].get(buffer_key) == [{"id": "1"}]
+        assert caches["default"].get(buffer_key) is None
+
+    @pytest.mark.django_db
+    def test_delete_side_buffer_lands_in_the_aliased_cache(self, settings):
+        settings.CACHES = {
+            "default": {
+                "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+                "LOCATION": "default-alias",
+            },
+            "fleet": {
+                "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+                "LOCATION": "fleet-alias",
+            },
+        }
+        settings.ICV_CACHES_ALIAS = "fleet"
+        settings.ICV_SEARCH_DEBOUNCE_SECONDS = 30
+        index = create_index("articles")
+
+        from django.core.cache import caches
+
+        with patch("icv_search.tasks.flush_debounce_removal_buffer.apply_async"):
+            _debounce_removal("articles", "1", 30)
+
+        buffer_key = f"icv_search:debounce_removal:{index.pk}"
+        assert caches["fleet"].get(buffer_key) == ["1"]
+        assert caches["default"].get(buffer_key) is None
+
+    @pytest.mark.django_db
+    def test_flush_reads_the_buffer_from_the_aliased_cache(self, settings):
+        """flush_debounce_buffer reads and clears the buffer through
+        ICV_CACHES_ALIAS: a buffer seeded only in the default alias must
+        look empty once the alias points elsewhere."""
+        settings.CACHES = {
+            "default": {
+                "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+                "LOCATION": "default-alias",
+            },
+            "fleet": {
+                "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+                "LOCATION": "fleet-alias",
+            },
+        }
+        index = create_index("articles")
+
+        from django.core.cache import caches
+
+        buffer_key = f"icv_search:debounce:{index.pk}"
+        caches["fleet"].set(buffer_key, [{"id": "1"}], timeout=60)
+
+        settings.ICV_CACHES_ALIAS = "fleet"
+
+        with patch("icv_search.services.documents.index_documents") as mock_index:
+            result = flush_debounce_buffer(str(index.pk))
+
+        assert result == 1
+        mock_index.assert_called_once()
+        assert caches["fleet"].get(buffer_key) is None

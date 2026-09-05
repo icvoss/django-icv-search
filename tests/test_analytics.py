@@ -1031,3 +1031,33 @@ class TestSearchQueryAggregateModel:
         assert "shoes" in s
         assert "products" in s
         assert "2026-03-22" in s
+
+
+class TestSearchQueryLogUserFkFollowsIcvAuthUserModel:
+    """SearchQueryLog.user targets the resolved ICV_AUTH_USER_MODEL (ADR-037),
+    not settings.AUTH_USER_MODEL directly."""
+
+    def test_deconstructs_to_settings_auth_user_model_when_unset(self, settings):
+        """With ICV_AUTH_USER_MODEL unset, the FK must still deconstruct to
+        settings.AUTH_USER_MODEL so shipped migrations stay byte-stable
+        (ADR-037, 'Migration-state consequence')."""
+        from icv_search.models.analytics import SearchQueryLog
+
+        assert not hasattr(settings, "ICV_AUTH_USER_MODEL")
+        field = SearchQueryLog._meta.get_field("user")
+        _, _, _, kwargs = field.deconstruct()
+        assert kwargs["to"] == settings.AUTH_USER_MODEL
+
+    def test_conf_resolves_to_the_override_when_set(self, settings):
+        """icv_search.conf.ICV_AUTH_USER_MODEL (what the field is built from
+        at model-import time) honours an explicit override."""
+        import importlib
+
+        from icv_search import conf
+
+        settings.ICV_AUTH_USER_MODEL = "auth.User"
+        importlib.reload(conf)
+        try:
+            assert conf.ICV_AUTH_USER_MODEL == "auth.User"
+        finally:
+            importlib.reload(conf)

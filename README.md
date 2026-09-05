@@ -185,6 +185,8 @@ All settings are namespaced under `ICV_SEARCH_*`. Every setting has a sensible d
 
 | Setting | Type | Default | Description |
 |---------|------|---------|-------------|
+| `ICV_AUTH_USER_MODEL` | `str` | `settings.AUTH_USER_MODEL` | Fleet-wide (ADR-037): the model `SearchQueryLog.user` targets. Set this only if you route icv packages' user FKs to a different model than your project's `AUTH_USER_MODEL` |
+| `ICV_CACHES_ALIAS` | `str` | `"default"` | Fleet-wide (ADR-037): the Django cache alias icv packages cache through (debounce buffers, merchandising rules). `ICV_SEARCH_CACHE_ALIAS` below defaults to this |
 | `ICV_SEARCH_BACKEND` | `str` | `"icv_search.backends.meilisearch.MeilisearchBackend"` | Dotted path to the active search backend class |
 | `ICV_SEARCH_URL` | `str` | `"http://localhost:7700"` | Search engine base URL |
 | `ICV_SEARCH_API_KEY` | `str` | `""` | Master or admin API key for the search engine |
@@ -201,7 +203,7 @@ All settings are namespaced under `ICV_SEARCH_*`. Every setting has a sensible d
 | `ICV_SEARCH_LOG_SAMPLE_RATE` | `float` | `1.0` | Fraction of individual `SearchQueryLog` rows to write (0.0 to 1.0). Aggregate counts always record at 100% |
 | `ICV_SEARCH_CACHE_ENABLED` | `bool` | `False` | Enable search result caching via Django's cache framework |
 | `ICV_SEARCH_CACHE_TIMEOUT` | `int` | `60` | Cache TTL in seconds for stored search results |
-| `ICV_SEARCH_CACHE_ALIAS` | `str` | `"default"` | Django cache alias used by the search result cache |
+| `ICV_SEARCH_CACHE_ALIAS` | `str` | resolved `ICV_CACHES_ALIAS` | Django cache alias used by the search result cache. Set to a dedicated alias when you want to evict search results independently from other icv caches |
 | `ICV_SEARCH_MERCHANDISING_ENABLED` | `bool` | `False` | Enable the merchandising layer |
 | `ICV_SEARCH_MERCHANDISING_CACHE_TIMEOUT` | `int` | `300` | Cache TTL in seconds for merchandising rules loaded from the database |
 
@@ -1434,9 +1436,13 @@ Enable caching to reduce backend load for repeated queries:
 
 ```python
 ICV_SEARCH_CACHE_ENABLED = True
-ICV_SEARCH_CACHE_TIMEOUT = 60       # seconds
-ICV_SEARCH_CACHE_ALIAS = "default"  # Django cache alias
+ICV_SEARCH_CACHE_TIMEOUT = 60  # seconds
+ICV_SEARCH_CACHE_ALIAS = "search"  # optional: evict search results independently of ICV_CACHES_ALIAS
 ```
+
+`ICV_SEARCH_CACHE_ALIAS` defaults to the resolved `ICV_CACHES_ALIAS` (ADR-037), so leaving it
+unset caches search results through the same alias every other icv package uses. Set it only
+when you want the search result cache to be evictable on its own.
 
 Cache is automatically invalidated when documents are indexed or removed.
 

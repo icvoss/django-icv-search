@@ -187,10 +187,13 @@ def flush_debounce_buffer(index_pk: str) -> int:
     materialises the entire accumulated buffer in memory and sends it as one
     oversized request.
     """
-    from django.core.cache import cache
+    from django.core.cache import caches
 
+    from icv_search.conf import ICV_CACHES_ALIAS
     from icv_search.models import SearchIndex
     from icv_search.services.documents import index_documents
+
+    cache = caches[ICV_CACHES_ALIAS]
 
     cache_key = f"icv_search:debounce:{index_pk}"
 
@@ -242,10 +245,13 @@ def flush_debounce_removal_buffer(index_pk: str) -> int:
     Reads buffered document IDs from the Django cache, clears the buffer,
     and removes them in chunks of ICV_SEARCH_DEBOUNCE_FLUSH_CHUNK_SIZE.
     """
-    from django.core.cache import cache
+    from django.core.cache import caches
 
+    from icv_search.conf import ICV_CACHES_ALIAS
     from icv_search.models import SearchIndex
     from icv_search.services.documents import remove_documents
+
+    cache = caches[ICV_CACHES_ALIAS]
 
     cache_key = f"icv_search:debounce_removal:{index_pk}"
 

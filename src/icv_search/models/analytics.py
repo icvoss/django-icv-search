@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-from django.conf import settings
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 
+from icv_search.conf import ICV_AUTH_USER_MODEL
 from icv_search.models.base import BaseModel
 
 
@@ -19,8 +19,9 @@ class SearchQueryLog(BaseModel):
     .. warning::
 
        Rows here hold end-user data: the verbatim ``query`` string, an
-       optional FK to ``AUTH_USER_MODEL``, and a free-form ``metadata`` JSON
-       field whose own help text invites session identifiers.
+       optional FK to the resolved ``ICV_AUTH_USER_MODEL`` (ADR-037; falls
+       back to ``AUTH_USER_MODEL``), and a free-form ``metadata`` JSON field
+       whose own help text invites session identifiers.
 
        ``tenant_id`` is an **advisory label, not an isolation boundary**. It
        is a plain string with no FK and no constraint; this package ships no
@@ -74,7 +75,7 @@ class SearchQueryLog(BaseModel):
         help_text=_("Time taken by the search engine to process the query."),
     )
     user = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
+        ICV_AUTH_USER_MODEL,
         null=True,
         blank=True,
         on_delete=models.SET_NULL,

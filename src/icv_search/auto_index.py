@@ -189,7 +189,11 @@ def _debounce_buffer_append(
     behaviour: buffered items must never sit unflushed indefinitely because
     no flush could ever be scheduled for them.
     """
-    from django.core.cache import cache
+    from django.core.cache import caches
+
+    from icv_search.conf import ICV_CACHES_ALIAS
+
+    cache = caches[ICV_CACHES_ALIAS]
 
     buffer = cache.get(cache_key, [])
     buffer.append(item)

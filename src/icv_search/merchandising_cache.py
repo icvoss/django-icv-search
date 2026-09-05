@@ -28,10 +28,17 @@ def _get_cache_timeout() -> int:
 
 
 def _get_cache() -> Any:
-    """Return the Django cache backend used for merchandising rules."""
-    from django.core.cache import cache
+    """Return the Django cache backend used for merchandising rules.
 
-    return cache
+    Resolved through ``ICV_CACHES_ALIAS`` (ADR-037), never the bare
+    default-alias ``cache`` object, so a consumer routing icv packages
+    through a non-default cache also gets merchandising rules cached there.
+    """
+    from django.core.cache import caches
+
+    from icv_search.conf import ICV_CACHES_ALIAS
+
+    return caches[ICV_CACHES_ALIAS]
 
 
 def load_rules(
