@@ -4,6 +4,18 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Fixed
+
+- **Shipped the migration #31 forgot** (issue #36). The `help_text` on
+  `SearchClick.tenant_id` and `SearchQueryLog.tenant_id` changed in 1.3.0
+  without a migration, so any consumer running `makemigrations --check`
+  with this package installed failed it, and plain `makemigrations`
+  generated the package's migration into the consumer's own project.
+  Migration `0007_tenant_id_help_text` carries the two `AlterField`
+  operations; it is state-only (no schema change) and must be applied on
+  upgrade. CI still has no gate that exercises the real migration graph;
+  that half of #36 stays open.
+
 ### Changed
 
 - **Adopted ADR-037's fleet-global settings for the user FK and cache
