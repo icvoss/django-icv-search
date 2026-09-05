@@ -242,7 +242,15 @@ class TestGetMatchingRules:
 
 
 class TestGetCacheHonoursCachesAlias:
-    """_get_cache() resolves through ICV_CACHES_ALIAS, not the default alias."""
+    """_get_cache() resolves through ICV_CACHES_ALIAS, not the default alias.
+
+    ``_get_cache()`` does ``from icv_search.conf import ICV_CACHES_ALIAS``
+    inside its own body, which re-reads ``icv_search.conf``'s current module
+    attribute on every call rather than ``django.conf.settings`` directly.
+    ``conf`` resolves that attribute once, at its own import time, so a test
+    overriding ``settings.ICV_CACHES_ALIAS`` must reload ``conf`` before
+    calling ``_get_cache()`` for the override to be visible.
+    """
 
     def test_writes_land_in_the_aliased_cache(self, settings):
         """Pointing ICV_CACHES_ALIAS at a second configured cache moves
@@ -258,6 +266,11 @@ class TestGetCacheHonoursCachesAlias:
             },
         }
         settings.ICV_CACHES_ALIAS = "fleet"
+        import importlib
+
+        from icv_search import conf
+
+        importlib.reload(conf)
 
         cache = _get_cache()
         cache.set("adr037-probe", "value")

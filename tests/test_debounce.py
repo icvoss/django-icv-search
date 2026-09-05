@@ -251,7 +251,17 @@ class TestDebounceBufferHonoursCachesAlias:
     """The debounce buffer (save and delete sides) writes through the
     resolved ICV_CACHES_ALIAS, not the default-alias cache object, so a
     consumer routing icv packages through a non-default cache also gets
-    debounce buffering there."""
+    debounce buffering there.
+
+    ``_debounce_buffer_append`` (used by both the save and delete sides) and
+    ``flush_debounce_buffer`` each do ``from icv_search.conf import
+    ICV_CACHES_ALIAS`` inside their own function body, which re-reads
+    ``icv_search.conf``'s current module attribute on every call rather than
+    ``django.conf.settings`` directly. Since ``conf`` resolves that attribute
+    once, at its own import time, a test overriding ``settings.
+    ICV_CACHES_ALIAS`` must reload ``conf`` before calling into production
+    code for the override to be visible.
+    """
 
     @pytest.mark.django_db
     def test_save_side_buffer_lands_in_the_aliased_cache(self, settings):
@@ -267,6 +277,11 @@ class TestDebounceBufferHonoursCachesAlias:
         }
         settings.ICV_CACHES_ALIAS = "fleet"
         settings.ICV_SEARCH_DEBOUNCE_SECONDS = 30
+        import importlib
+
+        from icv_search import conf
+
+        importlib.reload(conf)
         index = create_index("articles")
 
         from django.core.cache import caches
@@ -292,6 +307,11 @@ class TestDebounceBufferHonoursCachesAlias:
         }
         settings.ICV_CACHES_ALIAS = "fleet"
         settings.ICV_SEARCH_DEBOUNCE_SECONDS = 30
+        import importlib
+
+        from icv_search import conf
+
+        importlib.reload(conf)
         index = create_index("articles")
 
         from django.core.cache import caches
@@ -322,10 +342,15 @@ class TestDebounceBufferHonoursCachesAlias:
 
         from django.core.cache import caches
 
+        settings.ICV_CACHES_ALIAS = "fleet"
+        import importlib
+
+        from icv_search import conf
+
+        importlib.reload(conf)
+
         buffer_key = f"icv_search:debounce:{index.pk}"
         caches["fleet"].set(buffer_key, [{"id": "1"}], timeout=60)
-
-        settings.ICV_CACHES_ALIAS = "fleet"
 
         with patch("icv_search.services.documents.index_documents") as mock_index:
             result = flush_debounce_buffer(str(index.pk))

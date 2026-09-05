@@ -1046,18 +1046,26 @@ class TestSearchQueryLogUserFkFollowsIcvAuthUserModel:
         assert not hasattr(settings, "ICV_AUTH_USER_MODEL")
         field = SearchQueryLog._meta.get_field("user")
         _, _, _, kwargs = field.deconstruct()
-        assert kwargs["to"] == settings.AUTH_USER_MODEL
+        # ForeignKey.deconstruct() always lowercases the "to" reference
+        # (Django's own migration-serialisation convention, unrelated to
+        # ADR-037), so compare case-insensitively.
+        assert kwargs["to"] == settings.AUTH_USER_MODEL.lower()
 
     def test_conf_resolves_to_the_override_when_set(self, settings):
         """icv_search.conf.ICV_AUTH_USER_MODEL (what the field is built from
-        at model-import time) honours an explicit override."""
+        at model-import time) honours an explicit override.
+
+        Cleanup relies on the ``setting_changed`` signal handler in
+        ``conftest.py``, which reloads ``conf`` whenever
+        ``ICV_AUTH_USER_MODEL`` reverts (a ``finally: importlib.reload(conf)``
+        here would reload it too early, while the override is still live per
+        the ``settings`` fixture's own teardown timing, and leak the value
+        into later tests).
+        """
         import importlib
 
         from icv_search import conf
 
         settings.ICV_AUTH_USER_MODEL = "auth.User"
         importlib.reload(conf)
-        try:
-            assert conf.ICV_AUTH_USER_MODEL == "auth.User"
-        finally:
-            importlib.reload(conf)
+        assert conf.ICV_AUTH_USER_MODEL == "auth.User"
