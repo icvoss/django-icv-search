@@ -5,7 +5,7 @@ Provides a backend abstraction layer for search engines, index management,
 document indexing, and search query execution.
 """
 
-__version__ = "1.4.0"
+__version__ = "1.5.0"
 
 default_app_config = "icv_search.apps.IcvSearchConfig"
 

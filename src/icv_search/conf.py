@@ -209,3 +209,24 @@ ICV_SEARCH_TYPESENSE_GEO_FIELD: str = getattr(settings, "ICV_SEARCH_TYPESENSE_GE
 
 # Number of days to retain IndexSyncLog entries before cleanup deletes them.
 ICV_SEARCH_SYNC_LOG_RETENTION_DAYS: int = getattr(settings, "ICV_SEARCH_SYNC_LOG_RETENTION_DAYS", 90)
+
+
+def get_base_model():
+    """Return the abstract model base every icv-search model inherits from (ADR-052).
+
+    Resolves, in order: ICV_SEARCH_BASE_MODEL, else ICV_BASE_MODEL, else the
+    bundled icv_search._compat.BaseModel. Resolution is by dotted-path import
+    of an ABSTRACT class, never apps.get_model and never a guarded icv_core
+    import. Settings are read inside this function body so the default path
+    needs no Django settings configured beyond what this module already
+    requires at import time.
+    """
+    from django.conf import settings as django_settings
+    from django.utils.module_loading import import_string
+
+    path = (
+        getattr(django_settings, "ICV_SEARCH_BASE_MODEL", None)
+        or getattr(django_settings, "ICV_BASE_MODEL", None)
+        or "icv_search._compat.BaseModel"
+    )
+    return import_string(path)

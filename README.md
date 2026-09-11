@@ -112,15 +112,22 @@ Run migrations:
 python manage.py migrate icv_search
 ```
 
-### With icv-core
+### With icv-core (ADR-052)
 
-Installing with the `icv-core` extra gives you `BaseModel` (UUID primary key plus `created_at` / `updated_at` timestamps) from [django-icv-core](https://pypi.org/project/django-icv-core/):
+Models inherit a settings-resolved abstract base
+(`ICV_SEARCH_BASE_MODEL` -> `ICV_BASE_MODEL` ->
+`icv_search._compat.BaseModel`). To use
+[django-icv-core](https://pypi.org/project/django-icv-core/)'s base across the
+stack, set the shared setting once (installing the optional extra alone does
+not change the base):
 
 ```bash
 pip install "django-icv-search[icv-core]"
 ```
 
 ```python
+ICV_BASE_MODEL = "icv_core.models.BaseModel"
+
 INSTALLED_APPS = [
     # ...
     "icv_core",
@@ -128,7 +135,8 @@ INSTALLED_APPS = [
 ]
 ```
 
-Both `SearchIndex` and `IndexSyncLog` inherit from `icv_core.models.BaseModel` automatically when `icv_core` is present.
+Standalone installs leave the setting unset and use the bundled
+`_compat.BaseModel` (UUID primary key plus timestamps).
 
 ---
 

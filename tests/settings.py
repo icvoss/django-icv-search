@@ -78,6 +78,11 @@ ICV_SEARCH_AUTO_SYNC = False  # Disable auto-sync in tests by default
 ICV_SEARCH_ASYNC_INDEXING = False  # Disable async in tests
 ICV_SEARCH_INDEX_PREFIX = ""
 
+# Bridge ICV_BASE_MODEL from the environment so an integration environment can
+# drive the ADR-052 pairing without a settings change in the package.
+if os.environ.get("ICV_BASE_MODEL"):
+    ICV_BASE_MODEL = os.environ["ICV_BASE_MODEL"]
+
 # ICV Core
 ICV_CORE_AUDIT_ENABLED = False
 

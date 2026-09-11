@@ -37,8 +37,9 @@ All services are module-level functions, re-exported via `services/__init__.py`
 with `__all__`.
 
 ## Dependencies
-- `APP-001 icv-core`: optional; provides `BaseModel` (UUID PK + timestamps). When
-  absent, a bundled equivalent is used. Install via `pip install django-icv-search[icv-core]`
+- `APP-001 icv-core`: optional. Adopting its `BaseModel` is via
+  `ICV_BASE_MODEL = "icv_core.models.BaseModel"` (ADR-052), not install auto-detection.
+  The `[icv-core]` extra only pulls the package.
 - `django.contrib.auth`: `settings.AUTH_USER_MODEL` FK on `SearchQueryLog` (nullable)
 
 ## Consumed By
@@ -68,9 +69,9 @@ tracking, demand signal extraction, query clustering, and auto-synonym suggestio
 - **Multi-tenancy via `ICV_SEARCH_TENANT_PREFIX_FUNC`**: a configurable callable
   returns a per-request tenant string prepended to index names. Single-tenant
   deployments leave this empty; the app must not assume either mode.
-- **icv-core is optional**: the `models/base.py` module resolves `BaseModel`
-  at import time: icv-core's `BaseModel` if installed, otherwise the bundled
-  fallback. Do not import `icv_core.models` directly from within this package.
+- **Model base is settings-resolved (ADR-052)**: `models/base.py` sets
+  `BaseModel = get_base_model()` (`ICV_SEARCH_BASE_MODEL` -> `ICV_BASE_MODEL` ->
+  `icv_search._compat.BaseModel`). Do not import `icv_core.models` for the base.
 - **Auto-indexing via signal wiring, not `SearchableMixin` alone**: the
   `ICV_SEARCH_AUTO_INDEX` dict drives signal registration in `auto_index.py`;
   `SearchableMixin` declares the index mapping on the model but does not connect

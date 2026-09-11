@@ -2,6 +2,25 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.5.0] - 2026-09-11
+
+### Changed
+
+- **ADR-052: model base resolved from settings, not a guarded icv-core import**
+  (icvoss/django-icv-search#12). Models inherit
+  `icv_search.conf.get_base_model()`
+  (`ICV_SEARCH_BASE_MODEL` -> `ICV_BASE_MODEL` ->
+  `icv_search._compat.BaseModel`). System check
+  `icv_search.E005` rejects a non-abstract resolved base. The bundled
+  `_compat.BaseModel` field kwargs already matched the committed migration
+  state (`verbose_name` / `db_index`), so no migration was required.
+
+  **For consumers:** if you previously relied on installing `django-icv-core`
+  to auto-detect the shared base, set
+  `ICV_BASE_MODEL = "icv_core.models.BaseModel"` once. Standalone installs
+  need no change. The optional `[icv-core]` extra remains available to pull
+  django-icv-core; it no longer changes the base by itself.
+
 ## [1.4.0] - 2026-09-05
 
 ### Fixed
