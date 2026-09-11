@@ -1,42 +1,18 @@
-"""Base model for icv-search — uses icv-core BaseModel when available, otherwise provides a local equivalent."""
+"""Resolved abstract model base for icv-search (ADR-052).
+
+Every concrete model in this package inherits from ``BaseModel`` as returned
+by ``icv_search.conf.get_base_model()``. The default is the bundled
+``icv_search._compat.BaseModel``; a stack consumer sets ``ICV_BASE_MODEL``
+(or ``ICV_SEARCH_BASE_MODEL``) once. There is no guarded ``icv_core`` import.
+"""
 
 from __future__ import annotations
 
-import uuid
+from icv_search.conf import get_base_model
 
-from django.db import models
-from django.utils.translation import gettext_lazy as _
-
-try:
-    from icv_core.models import BaseModel
-except ImportError:
-
-    class BaseModel(models.Model):  # type: ignore[no-redef]
-        """Standalone base model when icv-core is not installed.
-
-        Provides the same UUID primary key and timestamp fields as
-        ``icv_core.models.BaseModel`` so icv-search can be used without
-        django-icv-core as a dependency.
-        """
-
-        id = models.UUIDField(
-            primary_key=True,
-            default=uuid.uuid4,
-            editable=False,
-            verbose_name=_("ID"),
-        )
-        created_at = models.DateTimeField(
-            auto_now_add=True,
-            db_index=True,
-            verbose_name=_("created at"),
-        )
-        updated_at = models.DateTimeField(
-            auto_now=True,
-            verbose_name=_("updated at"),
-        )
-
-        class Meta:
-            abstract = True
-
+# Resolved at class-definition time from ICV_SEARCH_BASE_MODEL / ICV_BASE_MODEL
+# / the bundled icv_search._compat.BaseModel default, never imported from
+# icv_core (ADR-052).
+BaseModel = get_base_model()
 
 __all__ = ["BaseModel"]
