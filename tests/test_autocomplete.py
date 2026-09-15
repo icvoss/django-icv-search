@@ -7,7 +7,7 @@ import pytest
 from icv_search.backends import reset_search_backend
 from icv_search.backends.dummy import DummyBackend
 from icv_search.models.analytics import SearchQueryLog
-from icv_search.services import autocomplete, create_index, index_documents
+from icv_search.services import autocomplete, create_index, index_documents, remove_documents
 
 
 @pytest.fixture(autouse=True)
@@ -160,6 +160,23 @@ class TestAutocompleteTenantResolution:
         create_index("products", tenant_id="tenant-b")
         result = autocomplete("products", "Tenant", tenant_id="tenant-b")
         assert len(result.hits) == 0
+
+    @pytest.mark.django_db
+    def test_cached_results_are_tenant_isolated_and_invalidated(self, settings):
+        """Autocomplete never returns or retains another tenant's cached hits."""
+        settings.ICV_SEARCH_CACHE_ENABLED = True
+        first = create_index("products", tenant_id="tenant-a")
+        second = create_index("products", tenant_id="tenant-b")
+        index_documents(first, [{"id": "a", "title": "Tenant A Product"}])
+        index_documents(second, [{"id": "b", "title": "Tenant B Product"}])
+
+        assert autocomplete(first, "Tenant").hits == [{"id": "a", "title": "Tenant A Product"}]
+        assert autocomplete(second, "Tenant").hits == [{"id": "b", "title": "Tenant B Product"}]
+
+        remove_documents(second, ["b"])
+
+        assert autocomplete(second, "Tenant").hits == []
+        assert autocomplete(first, "Tenant").hits == [{"id": "a", "title": "Tenant A Product"}]
 
 
 class TestAutocompleteExtraParams:

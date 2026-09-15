@@ -297,7 +297,7 @@ def autocomplete(
     cache = _get_cache()
 
     if cache is not None:
-        cached = cache.get(index.name, query, limit=limit, **params)
+        cached = cache.get(index.name, query, engine_uid=index.engine_uid, limit=limit, **params)
         if cached is not None:
             logger.debug(
                 "Cache hit for autocomplete '%s' in '%s'.",
@@ -311,7 +311,7 @@ def autocomplete(
     result = SearchResult.from_engine(raw)
 
     if cache is not None:
-        cache.set(index.name, query, result, limit=limit, **params)
+        cache.set(index.name, query, result, engine_uid=index.engine_uid, limit=limit, **params)
 
     logger.debug(
         "Autocomplete '%s' in '%s' returned %d hits.",

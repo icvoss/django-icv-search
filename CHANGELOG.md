@@ -12,7 +12,8 @@ All notable changes to this project will be documented in this file.
   true to false, the package now removes the existing document rather than
   leaving it in search results.
 - Search-result cache keys now include the resolved engine index identity. Two
-  tenant indexes with the same logical name no longer share cached results.
+  tenant indexes with the same logical name no longer share cached search or
+  autocomplete results.
 
 ### Changed
 
