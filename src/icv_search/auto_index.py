@@ -9,6 +9,7 @@ from contextlib import contextmanager
 from typing import Any
 
 from django.apps import apps
+from django.db import transaction
 from django.db.models.signals import post_delete, post_save
 from django.utils.module_loading import import_string
 
@@ -113,6 +114,10 @@ def _handle_post_save(
                 sender.__name__,
                 instance.pk,
             )
+            # A predicate can change after a document has already been indexed
+            # (for example, when an article is unpublished). Remove that stale
+            # document after commit rather than leaving it searchable.
+            _schedule_removal_after_commit(instance, index_name, config, using=kwargs.get("using"))
             return
 
     # Soft-delete awareness: if the instance has been soft-deleted, remove it
@@ -126,10 +131,10 @@ def _handle_post_save(
             instance.pk,
             index_name,
         )
-        _remove_instance(instance, index_name, config)
+        _schedule_removal_after_commit(instance, index_name, config, using=kwargs.get("using"))
         return
 
-    _index_instance(instance, index_name, config)
+    transaction.on_commit(lambda: _index_instance(instance, index_name, config), using=kwargs.get("using"))
 
 
 def _handle_post_delete(
@@ -146,7 +151,34 @@ def _handle_post_delete(
     if not config.get("on_delete", True):
         return
 
-    _remove_instance(instance, index_name, config)
+    _schedule_removal_after_commit(instance, index_name, config, using=kwargs.get("using"))
+
+
+def _schedule_removal_after_commit(
+    instance: Any,
+    index_name: str,
+    config: dict[str, Any],
+    *,
+    using: str | None,
+) -> None:
+    """Remove an existing indexed document after the current transaction commits."""
+    if instance.pk is None:
+        return
+
+    document_id = str(instance.pk)
+
+    from icv_search.models import SearchIndex
+
+    def remove_after_commit() -> None:
+        # Do not create an otherwise unused index merely because a new object
+        # is ineligible for indexing or is deleted before its first save.
+        # Check at commit time so a preceding eligible save in this transaction
+        # can create its index before this removal runs.
+        if not SearchIndex.objects.filter(name=index_name).exists():
+            return
+        _remove_document(document_id, index_name, config)
+
+    transaction.on_commit(remove_after_commit, using=using)
 
 
 def _get_debounce_seconds() -> int:
@@ -313,6 +345,9 @@ def _debounce_removal(index_name: str, document_id: str, debounce_seconds: int) 
 
 def _index_instance(instance: Any, index_name: str, config: dict[str, Any]) -> None:
     """Index a single model instance."""
+    if instance.pk is None:
+        return
+
     from icv_search.models import SearchIndex
 
     if not hasattr(instance, "to_search_document"):
@@ -379,14 +414,8 @@ def _index_instance(instance: Any, index_name: str, config: dict[str, Any]) -> N
         )
 
 
-def _remove_instance(instance: Any, index_name: str, config: dict[str, Any]) -> None:
-    """Remove a single model instance from the search index.
-
-    The document ID is resolved synchronously before any async dispatch so
-    the value is available even after the database row is deleted.
-    """
-    # Resolve document ID synchronously BEFORE the DB row is gone.
-    doc_id = str(instance.pk)
+def _remove_document(document_id: str, index_name: str, config: dict[str, Any]) -> None:
+    """Remove a single document from the search index after commit."""
 
     # Debounce: buffer document IDs and dispatch a single batched removal
     # after the window (#6). Mirrors _index_instance's debounce check below,
@@ -394,7 +423,7 @@ def _remove_instance(instance: Any, index_name: str, config: dict[str, Any]) -> 
     # one removal task per index instead of one task per row.
     debounce_seconds = _get_debounce_seconds()
     if debounce_seconds > 0:
-        _debounce_removal(index_name, doc_id, debounce_seconds)
+        _debounce_removal(index_name, document_id, debounce_seconds)
         return
 
     use_async = config.get("async")
@@ -410,7 +439,7 @@ def _remove_instance(instance: Any, index_name: str, config: dict[str, Any]) -> 
 
             try:
                 index = SearchIndex.objects.get(name=index_name)
-                remove_documents.delay(str(index.pk), [doc_id])
+                remove_documents.delay(str(index.pk), [document_id])
                 return
             except SearchIndex.DoesNotExist:
                 logger.warning(
@@ -424,12 +453,11 @@ def _remove_instance(instance: Any, index_name: str, config: dict[str, Any]) -> 
     from icv_search.services.documents import remove_documents
 
     try:
-        remove_documents(index_name, [doc_id])
+        remove_documents(index_name, [document_id])
     except Exception:
         logger.exception(
-            "Failed to auto-remove %s (pk=%s) from '%s'.",
-            type(instance).__name__,
-            instance.pk,
+            "Failed to auto-remove document %s from '%s'.",
+            document_id,
             index_name,
         )
 

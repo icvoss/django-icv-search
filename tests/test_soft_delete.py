@@ -161,7 +161,7 @@ class TestAutoIndexSoftDelete:
         ICV_SEARCH_AUTO_INDEX=_SOFT_DELETE_AUTO_INDEX_CONFIG,
         ICV_SEARCH_AUTO_SYNC=False,
     )
-    @pytest.mark.django_db
+    @pytest.mark.django_db(transaction=True)
     def test_saving_with_is_deleted_true_removes_from_index(self):
         """When is_deleted is set to True and save() is called, the document
         must be removed from the search index rather than re-indexed."""
@@ -209,7 +209,7 @@ class TestAutoIndexSoftDelete:
         ICV_SEARCH_AUTO_INDEX=_SOFT_DELETE_AUTO_INDEX_CONFIG,
         ICV_SEARCH_AUTO_SYNC=False,
     )
-    @pytest.mark.django_db
+    @pytest.mark.django_db(transaction=True)
     def test_active_save_still_indexes(self):
         """Saving an active (non-deleted) record must still trigger indexing."""
         connect_auto_index_signals()
@@ -243,7 +243,7 @@ class TestAutoIndexDeletedAt:
         ICV_SEARCH_AUTO_INDEX=_DELETED_AT_AUTO_INDEX_CONFIG,
         ICV_SEARCH_AUTO_SYNC=False,
     )
-    @pytest.mark.django_db
+    @pytest.mark.django_db(transaction=True)
     def test_setting_deleted_at_triggers_removal(self):
         """When deleted_at is set to a non-null value and save() is called, the
         document must be removed from the index."""

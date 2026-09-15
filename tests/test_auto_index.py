@@ -14,6 +14,8 @@ from icv_search.auto_index import (
 from icv_search.backends import reset_search_backend
 from icv_search.backends.dummy import DummyBackend, _documents
 
+pytestmark = pytest.mark.django_db(transaction=True)
+
 # ---------------------------------------------------------------------------
 # Shared config helpers
 # ---------------------------------------------------------------------------
@@ -119,7 +121,7 @@ class TestSkipIndexUpdate:
         assert not _is_skipped()
 
     @override_settings(ICV_SEARCH_AUTO_INDEX=_AUTO_INDEX_CONFIG, ICV_SEARCH_AUTO_SYNC=False)
-    @pytest.mark.django_db
+    @pytest.mark.django_db(transaction=True)
     def test_skip_prevents_indexing_on_save(self):
         """Saves inside skip_index_update should not trigger indexing."""
         connect_auto_index_signals()
@@ -132,7 +134,7 @@ class TestSkipIndexUpdate:
         assert all(len(docs) == 0 for docs in _documents.values())
 
     @override_settings(ICV_SEARCH_AUTO_INDEX=_AUTO_INDEX_CONFIG, ICV_SEARCH_AUTO_SYNC=False)
-    @pytest.mark.django_db
+    @pytest.mark.django_db(transaction=True)
     def test_indexing_resumes_after_skip(self):
         """Saves made after skip_index_update exits are indexed normally."""
         connect_auto_index_signals()
@@ -207,7 +209,7 @@ class TestConnectAutoIndexSignals:
         },
         ICV_SEARCH_AUTO_SYNC=False,
     )
-    @pytest.mark.django_db
+    @pytest.mark.django_db(transaction=True)
     def test_on_save_false_does_not_connect_save_signal(self):
         """When on_save=False, the post_save handler must not be connected."""
         connect_auto_index_signals()
@@ -230,7 +232,7 @@ class TestConnectAutoIndexSignals:
         },
         ICV_SEARCH_AUTO_SYNC=False,
     )
-    @pytest.mark.django_db
+    @pytest.mark.django_db(transaction=True)
     def test_model_without_to_search_document_skipped(self, settings):
         """A model that does not use SearchableMixin logs a warning and is skipped."""
         # Override to use a plain Django model without SearchableMixin
@@ -254,7 +256,7 @@ class TestAutoIndexOnSave:
     """Tests that model saves trigger document indexing."""
 
     @override_settings(ICV_SEARCH_AUTO_INDEX=_AUTO_INDEX_CONFIG, ICV_SEARCH_AUTO_SYNC=False)
-    @pytest.mark.django_db
+    @pytest.mark.django_db(transaction=True)
     def test_save_indexes_document(self):
         """Saving a model instance should index the document in the backend."""
         connect_auto_index_signals()
@@ -266,7 +268,7 @@ class TestAutoIndexOnSave:
         assert any(str(article.pk) in docs for docs in _documents.values())
 
     @override_settings(ICV_SEARCH_AUTO_INDEX=_AUTO_INDEX_CONFIG, ICV_SEARCH_AUTO_SYNC=False)
-    @pytest.mark.django_db
+    @pytest.mark.django_db(transaction=True)
     def test_save_stores_correct_document_content(self):
         """The indexed document should contain the expected fields."""
         connect_auto_index_signals()
@@ -297,7 +299,7 @@ class TestAutoIndexOnSave:
         },
         ICV_SEARCH_AUTO_SYNC=False,
     )
-    @pytest.mark.django_db
+    @pytest.mark.django_db(transaction=True)
     def test_on_save_false_skips_indexing(self):
         """When on_save is False, saves must not trigger indexing."""
         connect_auto_index_signals()
@@ -309,7 +311,7 @@ class TestAutoIndexOnSave:
         assert all(len(docs) == 0 for docs in _documents.values())
 
     @override_settings(ICV_SEARCH_AUTO_INDEX=_AUTO_INDEX_CONFIG, ICV_SEARCH_AUTO_SYNC=False)
-    @pytest.mark.django_db
+    @pytest.mark.django_db(transaction=True)
     def test_multiple_saves_index_multiple_documents(self):
         """Each save should result in an indexed document."""
         connect_auto_index_signals()
@@ -327,7 +329,7 @@ class TestAutoIndexOnSave:
         assert str(a2.pk) in all_pks
 
     @override_settings(ICV_SEARCH_AUTO_INDEX=_AUTO_INDEX_CONFIG, ICV_SEARCH_AUTO_SYNC=False)
-    @pytest.mark.django_db
+    @pytest.mark.django_db(transaction=True)
     def test_update_save_updates_indexed_document(self):
         """Updating a model instance should update its indexed document."""
         connect_auto_index_signals()
@@ -357,7 +359,7 @@ class TestAutoIndexOnDelete:
     """Tests that model deletions remove documents from the index."""
 
     @override_settings(ICV_SEARCH_AUTO_INDEX=_AUTO_INDEX_CONFIG, ICV_SEARCH_AUTO_SYNC=False)
-    @pytest.mark.django_db
+    @pytest.mark.django_db(transaction=True)
     def test_delete_removes_document(self):
         """Deleting a model instance should remove its document from the backend."""
         connect_auto_index_signals()
@@ -386,7 +388,7 @@ class TestAutoIndexOnDelete:
         },
         ICV_SEARCH_AUTO_SYNC=False,
     )
-    @pytest.mark.django_db
+    @pytest.mark.django_db(transaction=True)
     def test_on_delete_false_skips_removal(self):
         """When on_delete is False, deletion should not remove the document."""
         connect_auto_index_signals()
@@ -402,7 +404,7 @@ class TestAutoIndexOnDelete:
         assert any(article_pk in docs for docs in _documents.values())
 
     @override_settings(ICV_SEARCH_AUTO_INDEX=_AUTO_INDEX_CONFIG, ICV_SEARCH_AUTO_SYNC=False)
-    @pytest.mark.django_db
+    @pytest.mark.django_db(transaction=True)
     def test_delete_resolves_pk_before_row_is_gone(self):
         """The document ID used for removal must be the PK, not a DB lookup after delete."""
         connect_auto_index_signals()
@@ -418,6 +420,23 @@ class TestAutoIndexOnDelete:
         # because pk was resolved synchronously.
         assert all(expected_pk not in docs for docs in _documents.values())
 
+    @override_settings(ICV_SEARCH_AUTO_INDEX=_AUTO_INDEX_CONFIG, ICV_SEARCH_AUTO_SYNC=False)
+    def test_delete_inside_transaction_removes_document_after_commit(self):
+        """Deferred deletion retains the document ID after Django clears instance.pk."""
+        from django.db import transaction
+        from search_testapp.models import Article
+
+        connect_auto_index_signals()
+
+        article = Article.objects.create(title="Transactional delete", body="bye", author="Faye")
+        article_pk = str(article.pk)
+        assert any(article_pk in docs for docs in _documents.values())
+
+        with transaction.atomic():
+            article.delete()
+
+        assert all(article_pk not in docs for docs in _documents.values())
+
 
 # ===========================================================================
 # TestAutoCreateIndex
@@ -428,7 +447,7 @@ class TestAutoCreateIndex:
     """Tests for the auto_create=True behaviour."""
 
     @override_settings(ICV_SEARCH_AUTO_INDEX=_AUTO_INDEX_CONFIG, ICV_SEARCH_AUTO_SYNC=False)
-    @pytest.mark.django_db
+    @pytest.mark.django_db(transaction=True)
     def test_auto_creates_search_index_record(self):
         """auto_create=True should create a SearchIndex DB record on first save."""
         connect_auto_index_signals()
@@ -444,7 +463,7 @@ class TestAutoCreateIndex:
         assert SearchIndex.objects.filter(name="articles").exists()
 
     @override_settings(ICV_SEARCH_AUTO_INDEX=_AUTO_INDEX_CONFIG, ICV_SEARCH_AUTO_SYNC=False)
-    @pytest.mark.django_db
+    @pytest.mark.django_db(transaction=True)
     def test_auto_created_index_has_model_settings(self):
         """The auto-created SearchIndex should have settings derived from SearchableMixin."""
         connect_auto_index_signals()
@@ -461,7 +480,7 @@ class TestAutoCreateIndex:
         assert "searchableAttributes" in index.settings or "filterableAttributes" in index.settings
 
     @override_settings(ICV_SEARCH_AUTO_INDEX=_AUTO_INDEX_CONFIG, ICV_SEARCH_AUTO_SYNC=False)
-    @pytest.mark.django_db
+    @pytest.mark.django_db(transaction=True)
     def test_auto_create_only_creates_once(self):
         """Saving twice should only create one SearchIndex record."""
         connect_auto_index_signals()
@@ -486,7 +505,7 @@ class TestAutoCreateIndex:
         },
         ICV_SEARCH_AUTO_SYNC=False,
     )
-    @pytest.mark.django_db
+    @pytest.mark.django_db(transaction=True)
     def test_auto_create_false_does_not_create_index(self):
         """When auto_create=False, no SearchIndex should be created automatically."""
         connect_auto_index_signals()
@@ -528,7 +547,7 @@ class TestShouldUpdateCallable:
         },
         ICV_SEARCH_AUTO_SYNC=False,
     )
-    @pytest.mark.django_db
+    @pytest.mark.django_db(transaction=True)
     def test_should_update_false_skips_indexing(self):
         """When should_update(instance) returns False, the document must not be indexed."""
         import sys
@@ -562,7 +581,100 @@ class TestShouldUpdateCallable:
         },
         ICV_SEARCH_AUTO_SYNC=False,
     )
-    @pytest.mark.django_db
+    def test_should_update_false_removes_an_already_indexed_document(self):
+        """Unpublishing an indexed object removes its stale search document."""
+        import sys
+        import types
+
+        helpers = types.ModuleType("search_testapp.helpers")
+        helpers.should_index_article = lambda instance: instance.is_published  # type: ignore[attr-defined]
+        sys.modules["search_testapp.helpers"] = helpers
+
+        try:
+            connect_auto_index_signals()
+
+            from search_testapp.models import Article
+
+            article = Article.objects.create(title="Published", body="pub", author="Hank", is_published=True)
+            article_pk = str(article.pk)
+            assert any(article_pk in docs for docs in _documents.values())
+
+            article.is_published = False
+            article.save()
+
+            assert all(article_pk not in docs for docs in _documents.values())
+        finally:
+            sys.modules.pop("search_testapp.helpers", None)
+
+    @override_settings(
+        ICV_SEARCH_AUTO_INDEX={
+            "articles": {
+                "model": "search_testapp.Article",
+                "on_save": True,
+                "async": False,
+                "auto_create": True,
+                "should_update": "search_testapp.helpers.should_index_article",
+            },
+        },
+        ICV_SEARCH_AUTO_SYNC=False,
+    )
+    def test_should_update_false_after_create_in_transaction_leaves_no_document(self):
+        """A later ineligible save removes a document queued by an earlier save."""
+        import sys
+        import types
+
+        from django.db import transaction
+
+        helpers = types.ModuleType("search_testapp.helpers")
+        helpers.should_index_article = lambda instance: instance.is_published  # type: ignore[attr-defined]
+        sys.modules["search_testapp.helpers"] = helpers
+
+        try:
+            connect_auto_index_signals()
+
+            from search_testapp.models import Article
+
+            with transaction.atomic():
+                article = Article.objects.create(title="Published", body="pub", author="Hank", is_published=True)
+                article_pk = str(article.pk)
+                article.is_published = False
+                article.save()
+
+            assert all(article_pk not in docs for docs in _documents.values())
+        finally:
+            sys.modules.pop("search_testapp.helpers", None)
+
+
+class TestAutoIndexTransactionBoundary:
+    """Auto-index side effects run only after the database transaction commits."""
+
+    @override_settings(ICV_SEARCH_AUTO_INDEX=_AUTO_INDEX_CONFIG, ICV_SEARCH_AUTO_SYNC=False)
+    def test_rolled_back_save_does_not_index_document(self):
+        """A row that never commits must not become searchable."""
+        from django.db import transaction
+        from search_testapp.models import Article
+
+        connect_auto_index_signals()
+
+        with pytest.raises(RuntimeError), transaction.atomic():
+            Article.objects.create(title="Rolled back", body="no", author="Rae")
+            raise RuntimeError("roll back")
+
+        assert all(len(docs) == 0 for docs in _documents.values())
+
+    @override_settings(
+        ICV_SEARCH_AUTO_INDEX={
+            "articles": {
+                "model": "search_testapp.Article",
+                "on_save": True,
+                "async": False,
+                "auto_create": True,
+                "should_update": "search_testapp.helpers.should_index_article",
+            },
+        },
+        ICV_SEARCH_AUTO_SYNC=False,
+    )
+    @pytest.mark.django_db(transaction=True)
     def test_should_update_true_allows_indexing(self):
         """When should_update(instance) returns True, the document must be indexed."""
         import sys
@@ -594,7 +706,7 @@ class TestShouldUpdateCallable:
         },
         ICV_SEARCH_AUTO_SYNC=False,
     )
-    @pytest.mark.django_db
+    @pytest.mark.django_db(transaction=True)
     def test_should_update_mixed_results(self):
         """should_update gates each save independently."""
         import sys

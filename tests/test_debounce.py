@@ -102,7 +102,7 @@ class TestDeleteDebouncing:
             removed_ids.update(call.args[1])
         assert removed_ids == {"1", "2", "3"}
 
-    @pytest.mark.django_db
+    @pytest.mark.django_db(transaction=True)
     def test_bulk_delete_via_signals_schedules_one_flush_not_one_per_row(self, settings):
         """The exact #6 shape: N post_delete signals -> one scheduled flush."""
         settings.ICV_SEARCH_AUTO_INDEX = _DEBOUNCED_CONFIG

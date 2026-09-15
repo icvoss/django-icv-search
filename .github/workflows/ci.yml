@@ -88,3 +88,14 @@ jobs:
           DB_PASSWORD: icv_test_password
           DB_HOST: localhost
           DB_PORT: "5432"
+
+      - name: Check package migrations
+        run: python -m django makemigrations icv_search --check --dry-run
+        env:
+          DJANGO_SETTINGS_MODULE: settings_migrations
+          PYTHONPATH: src:tests
+          DB_NAME: icv_test_db
+          DB_USER: icv_test
+          DB_PASSWORD: icv_test_password
+          DB_HOST: localhost
+          DB_PORT: "5432"
