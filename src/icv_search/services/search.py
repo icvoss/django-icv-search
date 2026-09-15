@@ -84,7 +84,7 @@ def search(
     cache = _get_cache() if cache_eligible else None
 
     if cache is not None:
-        cached = cache.get(index.name, query, **params)
+        cached = cache.get(index.name, query, engine_uid=index.engine_uid, **params)
         if cached is not None:
             logger.debug(
                 "Cache hit for search '%s' in '%s'.",
@@ -98,7 +98,7 @@ def search(
     result = SearchResult.from_engine(raw)
 
     if cache is not None:
-        cache.set(index.name, query, result, **params)
+        cache.set(index.name, query, result, engine_uid=index.engine_uid, **params)
 
     logger.debug(
         "Search '%s' in '%s' returned %d hits.",

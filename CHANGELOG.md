@@ -2,6 +2,24 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.5.1] - 2026-09-15
+
+### Fixed
+
+- Auto-indexing now waits for the surrounding database transaction to commit.
+  A rolled-back model save or delete no longer sends an index task or changes
+  the search engine. When an auto-index `should_update` predicate changes from
+  true to false, the package now removes the existing document rather than
+  leaving it in search results.
+- Search-result cache keys now include the resolved engine index identity. Two
+  tenant indexes with the same logical name no longer share cached results.
+
+### Changed
+
+- CI now runs `makemigrations icv_search --check --dry-run` with the package's
+  real migration graph enabled, preventing model-state changes from shipping
+  without a package migration.
+
 ## [1.5.0] - 2026-09-11
 
 ### Changed

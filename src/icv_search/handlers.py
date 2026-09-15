@@ -67,7 +67,7 @@ def on_documents_indexed(sender, instance, **kwargs):
     from icv_search.cache import ICVSearchCache
 
     cache = ICVSearchCache()
-    cache.invalidate(instance.name)
+    cache.invalidate(instance.name, engine_uid=instance.engine_uid)
     logger.debug(
         "Cache invalidated for index '%s' after documents were indexed.",
         instance.name,
@@ -90,7 +90,7 @@ def on_documents_removed(sender, instance, **kwargs):
     from icv_search.cache import ICVSearchCache
 
     cache = ICVSearchCache()
-    cache.invalidate(instance.name)
+    cache.invalidate(instance.name, engine_uid=instance.engine_uid)
     logger.debug(
         "Cache invalidated for index '%s' after documents were removed.",
         instance.name,

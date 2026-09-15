@@ -9,6 +9,7 @@ from contextlib import contextmanager
 from typing import Any
 
 from django.apps import apps
+from django.db import transaction
 from django.db.models.signals import post_delete, post_save
 from django.utils.module_loading import import_string
 
@@ -113,6 +114,10 @@ def _handle_post_save(
                 sender.__name__,
                 instance.pk,
             )
+            # A predicate can change after a document has already been indexed
+            # (for example, when an article is unpublished). Remove that stale
+            # document after commit rather than leaving it searchable.
+            _schedule_removal_after_commit(instance, index_name, config)
             return
 
     # Soft-delete awareness: if the instance has been soft-deleted, remove it
@@ -126,10 +131,10 @@ def _handle_post_save(
             instance.pk,
             index_name,
         )
-        _remove_instance(instance, index_name, config)
+        _schedule_removal_after_commit(instance, index_name, config)
         return
 
-    _index_instance(instance, index_name, config)
+    transaction.on_commit(lambda: _index_instance(instance, index_name, config))
 
 
 def _handle_post_delete(
@@ -146,7 +151,22 @@ def _handle_post_delete(
     if not config.get("on_delete", True):
         return
 
-    _remove_instance(instance, index_name, config)
+    _schedule_removal_after_commit(instance, index_name, config)
+
+
+def _schedule_removal_after_commit(instance: Any, index_name: str, config: dict[str, Any]) -> None:
+    """Remove an existing indexed document after the current transaction commits."""
+    if instance.pk is None:
+        return
+
+    from icv_search.models import SearchIndex
+
+    # Do not create an otherwise unused index merely because a new object is
+    # ineligible for indexing or is deleted before its first indexed save.
+    if not SearchIndex.objects.filter(name=index_name).exists():
+        return
+
+    transaction.on_commit(lambda: _remove_instance(instance, index_name, config))
 
 
 def _get_debounce_seconds() -> int:

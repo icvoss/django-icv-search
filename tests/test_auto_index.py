@@ -14,6 +14,8 @@ from icv_search.auto_index import (
 from icv_search.backends import reset_search_backend
 from icv_search.backends.dummy import DummyBackend, _documents
 
+pytestmark = pytest.mark.django_db(transaction=True)
+
 # ---------------------------------------------------------------------------
 # Shared config helpers
 # ---------------------------------------------------------------------------
@@ -549,6 +551,62 @@ class TestShouldUpdateCallable:
             assert all(len(docs) == 0 for docs in _documents.values())
         finally:
             sys.modules.pop("search_testapp.helpers", None)
+
+    @override_settings(
+        ICV_SEARCH_AUTO_INDEX={
+            "articles": {
+                "model": "search_testapp.Article",
+                "on_save": True,
+                "async": False,
+                "auto_create": True,
+                "should_update": "search_testapp.helpers.should_index_article",
+            },
+        },
+        ICV_SEARCH_AUTO_SYNC=False,
+    )
+    def test_should_update_false_removes_an_already_indexed_document(self):
+        """Unpublishing an indexed object removes its stale search document."""
+        import sys
+        import types
+
+        helpers = types.ModuleType("search_testapp.helpers")
+        helpers.should_index_article = lambda instance: instance.is_published  # type: ignore[attr-defined]
+        sys.modules["search_testapp.helpers"] = helpers
+
+        try:
+            connect_auto_index_signals()
+
+            from search_testapp.models import Article
+
+            article = Article.objects.create(title="Published", body="pub", author="Hank", is_published=True)
+            article_pk = str(article.pk)
+            assert any(article_pk in docs for docs in _documents.values())
+
+            article.is_published = False
+            article.save()
+
+            assert all(article_pk not in docs for docs in _documents.values())
+        finally:
+            sys.modules.pop("search_testapp.helpers", None)
+
+
+class TestAutoIndexTransactionBoundary:
+    """Auto-index side effects run only after the database transaction commits."""
+
+    @override_settings(ICV_SEARCH_AUTO_INDEX=_AUTO_INDEX_CONFIG, ICV_SEARCH_AUTO_SYNC=False)
+    def test_rolled_back_save_does_not_index_document(self):
+        """A row that never commits must not become searchable."""
+        from django.db import transaction
+
+        from search_testapp.models import Article
+
+        connect_auto_index_signals()
+
+        with pytest.raises(RuntimeError), transaction.atomic():
+            Article.objects.create(title="Rolled back", body="no", author="Rae")
+            raise RuntimeError("roll back")
+
+        assert all(len(docs) == 0 for docs in _documents.values())
 
     @override_settings(
         ICV_SEARCH_AUTO_INDEX={

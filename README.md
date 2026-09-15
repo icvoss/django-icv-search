@@ -27,7 +27,7 @@ Search for Django without the lock-in. Point it at Meilisearch, PostgreSQL, or y
 ## Requirements
 
 - Python 3.11+
-- Django 5.1+
+- Django 5.2+
 
 ---
 
@@ -45,16 +45,21 @@ Search for Django without the lock-in. Point it at Meilisearch, PostgreSQL, or y
 ### Backends
 - **Meilisearch**: default; uses `httpx` directly, keeping dependencies minimal
 - **PostgreSQL**: zero-infrastructure full-text search using `tsvector` and `ts_rank`; no external service needed
+- **OpenSearch**: optional `opensearch-py` backend for self-managed clusters
+- **Apache Solr**: optional `pysolr` backend
+- **Typesense**: optional `typesense` backend
+- **Vespa**: optional `pyvespa` backend
 - **DummyBackend**: in-memory backend for fast, deterministic tests
 - **Custom backends**: subclass `BaseSearchBackend` and implement the abstract interface
 
 ### Indexing and index management
 - Create, configure, sync, and delete indexes; Django is the source of truth
 - Zero-downtime reindex: builds a temp index, then atomically swaps with the live one
-- Celery integration for async indexing with exponential backoff; degrades gracefully to synchronous when Celery is absent
+- Celery integration for async indexing with a fixed 60-second retry delay; degrades gracefully to synchronous when Celery is absent
 - Signal debouncing: batches rapid saves into a single indexing call
 - Soft-delete awareness: auto-excludes soft-deleted records on reindex and removes them on save
-- Management commands: `icv_search_setup`, `icv_search_health`, `icv_search_sync`, `icv_search_reindex`, `icv_search_create_index`, `icv_search_clear`
+- Ten management commands cover index setup, synchronisation, reindexing,
+  cleanup, click aggregation and search intelligence
 
 ### Query features
 - Facet distribution: normalised `facet_distribution` dict with `get_facet_values()` helper
@@ -226,7 +231,7 @@ All settings are namespaced under `ICV_SEARCH_*`. Every setting has a sensible d
 | `on_delete` | `bool` | `True` | Remove the document when the model instance is deleted |
 | `async` | `bool` | from `ICV_SEARCH_ASYNC_INDEXING` | Override async behaviour for this index only |
 | `auto_create` | `bool` | `True` | Create the `SearchIndex` record and engine index if they do not yet exist |
-| `should_update` | `str` | `""` | Dotted path to a callable `(instance) -> bool`. Document is only indexed when the callable returns `True` |
+| `should_update` | `str` | `""` | Dotted path to a callable `(instance) -> bool`. A false result removes any existing document after the database transaction commits |
 
 ```python
 ICV_SEARCH_AUTO_INDEX = {
@@ -1701,6 +1706,10 @@ ICV_SEARCH_BACKEND = "myproject.search_backends.MyBackend"
 | `icv_search_reindex --index NAME --model DOTTED.PATH [--batch-size N] [--tenant TENANT]` | Clear and re-index from `get_search_queryset()` in batches |
 | `icv_search_create_index --name NAME [--primary-key FIELD] [--tenant TENANT]` | Create a `SearchIndex` record and provision it in the engine |
 | `icv_search_clear --index NAME [--tenant TENANT]` | Remove all documents from an index without deleting it |
+| `icv_search_click_aggregate [--delete]` | Aggregate click events, optionally deleting the source events |
+| `icv_search_cleanup_sync_logs [--days DAYS]` | Delete completed index synchronisation logs older than the retention period |
+| `icv_search_intelligence [--all-indexes]` | Extract demand signals and query clusters for configured indexes |
+| `icv_search_auto_synonyms [--all-indexes]` | Create reviewable synonym suggestions from search intelligence |
 
 ```bash
 python manage.py icv_search_setup
@@ -1717,7 +1726,7 @@ python manage.py icv_search_clear --index products
 
 ## Celery Tasks
 
-Celery is optional. When not installed, all operations run synchronously. When installed with `ICV_SEARCH_ASYNC_INDEXING = True`, operations are dispatched as background tasks with exponential backoff (maximum three retries).
+Celery is optional. When not installed, all operations run synchronously. When installed with `ICV_SEARCH_ASYNC_INDEXING = True`, retrying tasks use a fixed 60-second delay (maximum three retries).
 
 | Task | Purpose |
 |------|---------|
@@ -1901,11 +1910,8 @@ Omit `ICV_SEARCH_TENANT_PREFIX_FUNC` for single-tenant deployments.
 
 ## Roadmap
 
-- SQLite FTS5 backend
-- MySQL FULLTEXT backend
+- SQLite FTS5 and MySQL FULLTEXT backends
 - Async (`httpx.AsyncClient`) support for ASGI applications
-- Typesense backend
-- Search result click-through tracking
 - A/B testing for ranking rules
 - PostGIS-backed geo search
 

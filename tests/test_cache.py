@@ -69,6 +69,13 @@ class TestICVSearchCacheMakeKey:
         k2 = cache.make_cache_key("articles", "shoes")
         assert k1 != k2
 
+    def test_same_logical_index_with_different_engine_uids_has_different_keys(self):
+        """Tenant-prefixed indexes with a shared name must not share cached hits."""
+        cache = ICVSearchCache()
+        first = cache.make_cache_key("products", "shoes", engine_uid="tenant_a_products")
+        second = cache.make_cache_key("products", "shoes", engine_uid="tenant_b_products")
+        assert first != second
+
     def test_different_params_different_key(self):
         cache = ICVSearchCache()
         k1 = cache.make_cache_key("products", "shoes", limit=5)
@@ -398,3 +405,20 @@ class TestCacheServiceIntegration:
         # Next search should reflect the removal
         result2 = search(index, "Django")
         assert len(result2.hits) == 0
+
+    def test_same_name_tenant_indexes_do_not_share_a_cached_result(self, settings):
+        """A cache hit for one tenant cannot disclose another tenant's documents."""
+        from icv_search.services import create_index, index_documents, search
+
+        settings.ICV_SEARCH_CACHE_ENABLED = True
+
+        first = create_index("products", tenant_id="tenant_a")
+        second = create_index("products", tenant_id="tenant_b")
+        index_documents(first, [{"id": "a", "title": "Tenant A shoes"}])
+        index_documents(second, [{"id": "b", "title": "Tenant B shoes"}])
+
+        first_result = search(first, "shoes")
+        second_result = search(second, "shoes")
+
+        assert first_result.hits == [{"id": "a", "title": "Tenant A shoes"}]
+        assert second_result.hits == [{"id": "b", "title": "Tenant B shoes"}]
