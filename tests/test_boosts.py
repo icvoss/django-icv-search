@@ -473,4 +473,3 @@ class TestEvaluateOperatorNumericFallthrough:
         with caplog.at_level(logging.WARNING, logger="icv_search.services.boosts"):
             _evaluate_operator({"sku": "ABC"}, "sku", "eq", "ABC")
         assert not any("Boost numeric comparison failed" in r.message for r in caplog.records)
-

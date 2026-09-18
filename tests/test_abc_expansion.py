@@ -865,7 +865,4 @@ class TestBaseSearchBackendDefaults:
             docs = backend.get_documents("any-index", document_ids=["1", "missing", "2"])
         ids = {d["id"] for d in docs}
         assert ids == {"1", "2"}
-        assert any(
-            "Failed to fetch document" in r.message and "missing" in r.message
-            for r in caplog.records
-        )
+        assert any("Failed to fetch document" in r.message and "missing" in r.message for r in caplog.records)

@@ -362,9 +362,12 @@ class TestHealthView:
     @override_settings(ROOT_URLCONF=_health_urlconf)
     def test_health_unavailable_on_exception(self, client, caplog):
         """When health() raises an exception, view returns 503 and logs a warning."""
-        with caplog.at_level(logging.WARNING, logger="icv_search.views"), patch(
-            "icv_search.backends.dummy.DummyBackend.health",
-            side_effect=Exception("connection refused"),
+        with (
+            caplog.at_level(logging.WARNING, logger="icv_search.views"),
+            patch(
+                "icv_search.backends.dummy.DummyBackend.health",
+                side_effect=Exception("connection refused"),
+            ),
         ):
             response = client.get("/health/")
         assert response.status_code == 503

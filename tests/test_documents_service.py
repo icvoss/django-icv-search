@@ -326,8 +326,7 @@ class TestReindexZeroDowntimeCleanupLogging:
 
         assert total == 1
         assert any(
-            "Failed to delete temporary index" in r.message and "after swap" in r.message
-            for r in caplog.records
+            "Failed to delete temporary index" in r.message and "after swap" in r.message for r in caplog.records
         )
 
     @pytest.mark.django_db
@@ -360,4 +359,3 @@ class TestReindexZeroDowntimeCleanupLogging:
             "Failed to delete temporary index" in r.message and "after reindex failure" in r.message
             for r in caplog.records
         )
-
