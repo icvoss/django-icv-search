@@ -220,6 +220,28 @@ class TestGetMatchingRules:
         rule.refresh_from_db()
         assert rule.hit_count == 0
 
+    def test_hit_count_update_failure_propagates(self, monkeypatch):
+        """A failed hit_count bulk update is not swallowed (#46 / BR-106)."""
+        from django.db import DatabaseError
+
+        _redirect(query_pattern="shoes", hit_count=0)
+        real_filter = QueryRedirect.objects.filter
+
+        def filter_wrapper(*args, **kwargs):
+            qs = real_filter(*args, **kwargs)
+            if kwargs.get("pk__in") is not None:
+
+                def failing_update(**_kw):
+                    raise DatabaseError("simulated hit_count update failure")
+
+                qs.update = failing_update  # type: ignore[method-assign]
+            return qs
+
+        monkeypatch.setattr(QueryRedirect.objects, "filter", filter_wrapper)
+
+        with pytest.raises(DatabaseError, match="simulated hit_count update failure"):
+            get_matching_rules(QueryRedirect, "QueryRedirect", "products", "shoes")
+
     def test_skips_rule_outside_schedule(self):
         """A rule whose starts_at is in the future must not be returned."""
         _redirect(
