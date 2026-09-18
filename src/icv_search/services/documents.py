@@ -630,14 +630,22 @@ def reindex_zero_downtime(
             try:
                 backend.delete_index(uid=temp_uid)
             except Exception:
-                pass
+                logger.warning(
+                    "Failed to delete temporary index '%s' during swap fallback.",
+                    temp_uid,
+                    exc_info=True,
+                )
             return reindex_all(index, model_class, tenant_id=tenant_id, batch_size=batch_size)
 
         # 4. Delete the old index (now under the temp name after swap)
         try:
             backend.delete_index(uid=temp_uid)
         except Exception:
-            logger.warning("Failed to delete temporary index '%s' after swap.", temp_uid)
+            logger.warning(
+                "Failed to delete temporary index '%s' after swap.",
+                temp_uid,
+                exc_info=True,
+            )
 
         log.mark_complete(status="success", detail=f"Zero-downtime reindex: {total} documents.")
         logger.info("Zero-downtime reindex of '%s' complete: %d documents.", index.name, total)
@@ -648,7 +656,11 @@ def reindex_zero_downtime(
         try:
             backend.delete_index(uid=temp_uid)
         except Exception:
-            pass
+            logger.warning(
+                "Failed to delete temporary index '%s' after reindex failure.",
+                temp_uid,
+                exc_info=True,
+            )
         log.mark_complete(status="failed", detail=str(exc))
         logger.exception("Zero-downtime reindex failed for '%s'.", index.name)
         raise

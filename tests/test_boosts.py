@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from datetime import timedelta
 from decimal import Decimal
 
@@ -435,3 +436,41 @@ class TestEvaluateOperatorMissingField:
 
     def test_missing_field_gt_returns_false(self):
         assert _evaluate_operator({}, "missing", "gt", "1") is False
+
+
+class TestEvaluateOperatorNumericFallthrough:
+    """_evaluate_operator() logs when numeric comparison falls through to string."""
+
+    def test_eq_fallthrough_logs_debug(self, caplog):
+        with caplog.at_level(logging.DEBUG, logger="icv_search.services.boosts"):
+            result = _evaluate_operator({"sku": "ABC"}, "sku", "eq", "ABC")
+        assert result is True
+        records = [r for r in caplog.records if "Boost numeric comparison failed" in r.message]
+        assert len(records) == 1
+        assert records[0].levelno == logging.DEBUG
+        assert "eq" in records[0].message
+
+    def test_gt_fallthrough_logs_warning(self, caplog):
+        with caplog.at_level(logging.WARNING, logger="icv_search.services.boosts"):
+            result = _evaluate_operator({"sku": "ABC"}, "sku", "gt", "10")
+        # String comparison still runs; "abc" > "10" is True lexicographically.
+        assert result is True
+        records = [r for r in caplog.records if "Boost numeric comparison failed" in r.message]
+        assert len(records) == 1
+        assert records[0].levelno == logging.WARNING
+        assert "gt" in records[0].message
+
+    def test_gte_fallthrough_logs_warning(self, caplog):
+        with caplog.at_level(logging.WARNING, logger="icv_search.services.boosts"):
+            _evaluate_operator({"tag": "premium"}, "tag", "gte", "1")
+        assert any(
+            r.levelno == logging.WARNING and "gte" in r.message
+            for r in caplog.records
+            if "Boost numeric comparison failed" in r.message
+        )
+
+    def test_eq_fallthrough_does_not_warn(self, caplog):
+        with caplog.at_level(logging.WARNING, logger="icv_search.services.boosts"):
+            _evaluate_operator({"sku": "ABC"}, "sku", "eq", "ABC")
+        assert not any("Boost numeric comparison failed" in r.message for r in caplog.records)
+

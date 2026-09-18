@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import logging
+
 import pytest
 
 from icv_search.backends import get_search_backend, reset_search_backend
@@ -632,3 +634,21 @@ class TestResolveIndexAutoCreate:
         create_index("products")
         search("products", "test")
         assert SearchIndex.objects.filter(name="products").count() == 1
+
+    @pytest.mark.django_db
+    def test_unresolvable_model_path_logs_warning(self, settings, caplog):
+        """A bad ICV_SEARCH_AUTO_INDEX model path logs a warning and still creates the index."""
+        settings.ICV_SEARCH_AUTO_INDEX = {
+            "broken": {
+                "model": "search_testapp.DoesNotExist",
+            },
+        }
+        with caplog.at_level(logging.WARNING, logger="icv_search.services._utils"):
+            search("broken", "test")
+        assert SearchIndex.objects.filter(name="broken").exists()
+        assert any(
+            "Could not resolve model path" in r.message and "broken" in r.message
+            for r in caplog.records
+        )
+        index = SearchIndex.objects.get(name="broken")
+        assert index.settings == {}

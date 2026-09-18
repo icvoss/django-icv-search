@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from unittest.mock import patch
 
 import pytest
@@ -11,7 +12,7 @@ from icv_search.backends.dummy import DummyBackend
 from icv_search.exceptions import SearchBackendError
 from icv_search.models import IndexSyncLog
 from icv_search.services import create_index, index_documents, remove_documents
-from icv_search.services.documents import index_model_instances, reindex_all
+from icv_search.services.documents import index_model_instances, reindex_all, reindex_zero_downtime
 
 
 @pytest.fixture(autouse=True)
@@ -271,3 +272,92 @@ class TestReindexAll:
 
         count = reindex_all("articles", Article)
         assert count == 1
+
+
+class TestReindexZeroDowntimeCleanupLogging:
+    """reindex_zero_downtime() logs temp-index cleanup failures (ADR-101 / #54)."""
+
+    @pytest.mark.django_db
+    def test_swap_fallback_cleanup_failure_logs_warning(self, caplog):
+        from search_testapp.models import Article
+
+        index = create_index("articles")
+        Article.objects.create(title="A", body="B", author="Author")
+
+        with (
+            patch(
+                "icv_search.backends.dummy.DummyBackend.swap_indexes",
+                side_effect=NotImplementedError("no swap"),
+            ),
+            patch(
+                "icv_search.backends.dummy.DummyBackend.delete_index",
+                side_effect=RuntimeError("cleanup failed"),
+            ),
+            caplog.at_level(logging.WARNING, logger="icv_search.services.documents"),
+        ):
+            total = reindex_zero_downtime(index, Article)
+
+        assert total == 1
+        assert any(
+            "Failed to delete temporary index" in r.message and "during swap fallback" in r.message
+            for r in caplog.records
+        )
+
+    @pytest.mark.django_db
+    def test_post_swap_cleanup_failure_logs_warning(self, caplog):
+        from search_testapp.models import Article
+
+        index = create_index("articles")
+        Article.objects.create(title="A", body="B", author="Author")
+        temp_uid = f"{index.engine_uid}_reindex_tmp"
+
+        original_delete = DummyBackend.delete_index
+
+        def delete_index(self, uid, *args, **kwargs):
+            if uid == temp_uid:
+                raise RuntimeError("post-swap cleanup failed")
+            return original_delete(self, uid, *args, **kwargs)
+
+        with (
+            patch.object(DummyBackend, "delete_index", delete_index),
+            caplog.at_level(logging.WARNING, logger="icv_search.services.documents"),
+        ):
+            total = reindex_zero_downtime(index, Article)
+
+        assert total == 1
+        assert any(
+            "Failed to delete temporary index" in r.message and "after swap" in r.message
+            for r in caplog.records
+        )
+
+    @pytest.mark.django_db
+    def test_failure_cleanup_logs_warning(self, caplog):
+        from search_testapp.models import Article
+
+        index = create_index("articles")
+        Article.objects.create(title="A", body="B", author="Author")
+        temp_uid = f"{index.engine_uid}_reindex_tmp"
+
+        original_delete = DummyBackend.delete_index
+
+        def delete_index(self, uid, *args, **kwargs):
+            if uid == temp_uid:
+                raise RuntimeError("failure cleanup failed")
+            return original_delete(self, uid, *args, **kwargs)
+
+        with (
+            patch(
+                "icv_search.backends.dummy.DummyBackend.swap_indexes",
+                side_effect=SearchBackendError("swap failed"),
+            ),
+            patch.object(DummyBackend, "delete_index", delete_index),
+            caplog.at_level(logging.WARNING, logger="icv_search.services.documents"),
+            pytest.raises(SearchBackendError),
+        ):
+            reindex_zero_downtime(index, Article)
+
+        assert any(
+            "Failed to delete temporary index" in r.message and "after reindex failure" in r.message
+            for r in caplog.records
+        )
+
