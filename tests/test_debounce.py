@@ -8,7 +8,7 @@ buffered list in a single call, with no chunking.
 
 from __future__ import annotations
 
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 from django.core.cache import cache
@@ -240,6 +240,30 @@ class TestDebounceFlushChunking:
 
         assert result == 0
         mock_index.assert_not_called()
+
+
+# ===========================================================================
+# #46: debounce buffer cache.write failure propagates
+# ===========================================================================
+
+
+class TestDebounceCacheWriteFailure:
+    """cache.set failures during buffer append are not swallowed (#46)."""
+
+    @pytest.mark.django_db
+    def test_cache_set_failure_during_buffer_append_propagates(self, settings):
+        """A cache.set failure while appending to the debounce buffer propagates."""
+        settings.ICV_SEARCH_DEBOUNCE_SECONDS = 30
+        create_index("articles")
+
+        mock_cache = MagicMock()
+        mock_cache.get.return_value = []
+        mock_cache.set.side_effect = RuntimeError("cache backend unavailable")
+
+        with patch("django.core.cache.caches") as mock_caches:
+            mock_caches.__getitem__.return_value = mock_cache
+            with pytest.raises(RuntimeError, match="cache backend unavailable"):
+                _debounce_document("articles", {"id": "1"}, 30)
 
 
 # ===========================================================================

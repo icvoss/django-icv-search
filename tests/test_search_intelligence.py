@@ -735,6 +735,28 @@ class TestPreprocessingPipeline:
         assert len(preprocess_rules) == 1
         assert preprocess_rules[0]["filters_extracted"] == {"category": "footwear"}
 
+    def test_caller_filters_win_on_key_collision(self, products_index):
+        """Caller-supplied filter values win over preprocessor extracts on key collision (BR-028)."""
+        import icv_search.services.preprocessing as _mod
+        from icv_search.services.merchandising import merchandised_search
+        from icv_search.services.search import search as real_search
+
+        _mod._preprocessor_callable = _make_preprocessor(
+            extracted_filters={"category": "footwear"},
+        )
+
+        with patch("icv_search.services.search.search", wraps=real_search) as mock_search:
+            result = merchandised_search(
+                "products",
+                "",
+                filter={"category": "clothing"},
+                log_query=False,
+            )
+
+        assert mock_search.call_args.kwargs["filter"] == {"category": "clothing"}
+        # clothing wins: Blue Shirt only; footwear would have returned Red Shoes.
+        assert [hit["id"] for hit in result.hits] == ["2"]
+
     def test_preprocessing_redirect_short_circuits(self, products_index):
         """A redirect_url from the preprocessor short-circuits the pipeline (BR-027)."""
         import icv_search.services.preprocessing as _mod

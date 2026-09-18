@@ -286,6 +286,23 @@ class TestUpdateIndexSettings:
         assert log is not None
         assert log.status == "success"
 
+    @pytest.mark.django_db
+    def test_django_settings_overwrite_out_of_band_engine_settings(self):
+        """On conflict, a sync pushes Django settings over out-of-band engine values (BR-004)."""
+        from icv_search.services.indexing import _sync_index_to_engine
+
+        index = create_index("products", settings={"searchableAttributes": ["name"]})
+        backend = DummyBackend()
+        backend.update_settings(index.engine_uid, {"searchableAttributes": ["title"]})
+        assert backend.get_settings(index.engine_uid)["searchableAttributes"] == ["title"]
+
+        _sync_index_to_engine(index)
+
+        stored = backend.get_settings(index.engine_uid)
+        assert stored.get("searchableAttributes") == ["name"]
+        index.refresh_from_db()
+        assert index.settings.get("searchableAttributes") == ["name"]
+
 
 class TestGetIndexStats:
     """get_index_stats() service function."""
