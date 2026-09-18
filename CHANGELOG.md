@@ -4,7 +4,13 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [1.6.0] - 2026-09-18
+
 ### Fixed
+
+- **ADR-101 operator visibility:** previously silent failure paths now emit
+  WARNING or DEBUG logs as shipped. Return values and HTTP response bodies
+  are unchanged; only observability changes.
 
 - Log unresolvable `ICV_SEARCH_AUTO_INDEX` model paths instead of silently
   skipping SearchableMixin settings extraction (#42).
