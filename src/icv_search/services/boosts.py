@@ -144,7 +144,29 @@ def _evaluate_operator(hit: dict[str, Any], field: str, operator: str, value: st
         if operator == "lte":
             return num_field <= num_value
     except (TypeError, ValueError):
-        pass
+        # Numeric cast failed; fall through to string comparison. Relational
+        # operators get WARNING so a misconfigured numeric rule is visible;
+        # eq/neq fallthrough is DEBUG to avoid log storms on mixed-type fields.
+        if operator in {"gt", "gte", "lt", "lte"}:
+            logger.warning(
+                "Boost numeric comparison failed for field '%s' operator '%s' "
+                "(field_value=%r, rule_value=%r); falling back to string comparison.",
+                field,
+                operator,
+                field_val,
+                value,
+                exc_info=True,
+            )
+        else:
+            logger.debug(
+                "Boost numeric comparison failed for field '%s' operator '%s' "
+                "(field_value=%r, rule_value=%r); falling back to string comparison.",
+                field,
+                operator,
+                field_val,
+                value,
+                exc_info=True,
+            )
 
     # String comparison fallback.
     str_field = str(field_val).lower()

@@ -9,6 +9,8 @@ Covers:
 
 from __future__ import annotations
 
+import logging
+
 import pytest
 
 from icv_search.backends import reset_search_backend
@@ -818,8 +820,8 @@ class TestBaseSearchBackendDefaults:
         assert "name" in docs[0]
         assert "id" in docs[0]
 
-    def test_get_documents_with_ids_skips_failed_fetches(self):
-        """get_documents() default silently skips IDs whose get_document raises."""
+    def test_get_documents_with_ids_skips_failed_fetches(self, caplog):
+        """get_documents() skips IDs whose get_document raises, and logs the failure."""
         from icv_search.backends.base import BaseSearchBackend
 
         class _PartialBackend(BaseSearchBackend):
@@ -859,6 +861,8 @@ class TestBaseSearchBackendDefaults:
                 return {"id": document_id}
 
         backend = _PartialBackend(url="", api_key="")
-        docs = backend.get_documents("any-index", document_ids=["1", "missing", "2"])
+        with caplog.at_level(logging.WARNING, logger="icv_search.backends.base"):
+            docs = backend.get_documents("any-index", document_ids=["1", "missing", "2"])
         ids = {d["id"] for d in docs}
         assert ids == {"1", "2"}
+        assert any("Failed to fetch document" in r.message and "missing" in r.message for r in caplog.records)

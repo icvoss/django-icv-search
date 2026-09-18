@@ -2,6 +2,21 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+### Fixed
+
+- Log unresolvable `ICV_SEARCH_AUTO_INDEX` model paths instead of silently
+  skipping SearchableMixin settings extraction (#42).
+- Log per-ID `get_documents()` fetch failures instead of discarding them
+  silently (#39).
+- Log temp-index cleanup failures in `reindex_zero_downtime()` (swap fallback,
+  post-swap success cleanup, and outer failure cleanup) (#54).
+- Log `backend.health()` exceptions in the health check view while keeping the
+  HTTP body unchanged (#40).
+- Log numeric-to-string fallthrough in boost `_evaluate_operator`: DEBUG for
+  `eq`/`neq`, WARNING for `gt`/`gte`/`lt`/`lte` (#52).
+
 ## [1.5.1] - 2026-09-15
 
 ### Fixed

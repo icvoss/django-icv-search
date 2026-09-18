@@ -31,6 +31,12 @@ def _get_model_class_for_index(index_name: str) -> type | None:
         app_label, model_name = model_path.rsplit(".", 1)
         return apps.get_model(app_label, model_name)
     except (LookupError, ValueError):
+        logger.warning(
+            "Could not resolve model path '%s' for index '%s'.",
+            model_path,
+            index_name,
+            exc_info=True,
+        )
         return None
 
 

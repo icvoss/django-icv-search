@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import sys
 
 from django.http import HttpResponse, JsonResponse
@@ -10,6 +11,8 @@ from django.views.decorators.http import require_GET, require_POST
 
 from icv_search.backends import get_search_backend
 from icv_search.middleware import get_current_tenant_id
+
+logger = logging.getLogger(__name__)
 
 _MAX_FIELD_LENGTH = 500
 _MAX_METADATA_BYTES = 10240  # 10 KB
@@ -28,6 +31,7 @@ def icv_search_health(request):
     try:
         healthy = backend.health()
     except Exception:
+        logger.warning("Search backend health check failed.", exc_info=True)
         healthy = False
 
     if healthy:

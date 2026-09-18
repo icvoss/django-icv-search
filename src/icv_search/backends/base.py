@@ -249,7 +249,14 @@ class BaseSearchBackend(ABC):
                 try:
                     results.append(self.get_document(uid, doc_id))
                 except Exception:
-                    pass  # Skip documents that cannot be fetched
+                    # Skip documents that cannot be fetched; log so failure is
+                    # distinguishable from a missing document (ADR-101).
+                    logger.warning(
+                        "Failed to fetch document '%s' from index '%s'.",
+                        doc_id,
+                        uid,
+                        exc_info=True,
+                    )
             if fields is not None:
                 keep = set(fields) | {"id"}
                 results = [{k: v for k, v in doc.items() if k in keep} for doc in results]
