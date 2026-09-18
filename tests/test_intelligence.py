@@ -671,6 +671,31 @@ class TestAutoCreateRewrites:
         assert result[0]["rewrite_id"] is not None
 
     @pytest.mark.django_db
+    def test_second_call_does_not_duplicate_rewrites(self):
+        from icv_search.models.merchandising import QueryRewrite
+
+        suggestion = {
+            "source_query": "waterproof jacket",
+            "suggested_synonym": "rain coat",
+            "confidence": 0.87,
+            "evidence_count": 2,
+        }
+
+        with patch(
+            "icv_search.services.intelligence.suggest_synonyms",
+            return_value=[suggestion],
+        ):
+            first = auto_create_rewrites("products", confidence_threshold=0.8)
+            second = auto_create_rewrites("products", confidence_threshold=0.8)
+
+        assert first[0]["action"] == "created"
+        assert QueryRewrite.objects.filter(query_pattern="waterproof jacket").count() == 1
+
+        assert second[0]["action"] == "already_exists"
+        assert second[0]["rewrite_id"] == first[0]["rewrite_id"]
+        assert QueryRewrite.objects.filter(query_pattern="waterproof jacket").count() == 1
+
+    @pytest.mark.django_db
     def test_dry_run_does_not_create_record(self):
         from icv_search.models.merchandising import QueryRewrite
 
