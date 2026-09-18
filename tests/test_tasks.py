@@ -323,3 +323,25 @@ class TestRefreshDocumentCounts:
         """Task should return 0 when no active indexes exist."""
         count = refresh_document_counts()
         assert count == 0
+
+
+class TestRetryConfiguration:
+    """Documented retry policy on the three bind=True Celery tasks (#48)."""
+
+    @pytest.mark.parametrize(
+        "task",
+        [sync_index_settings, add_documents, remove_documents],
+        ids=["sync_index_settings", "add_documents", "remove_documents"],
+    )
+    def test_max_retries_is_three(self, task):
+        """Each retrying task is decorated with ``max_retries=3``."""
+        assert task.max_retries == 3
+
+    @pytest.mark.parametrize(
+        "task",
+        [sync_index_settings, add_documents, remove_documents],
+        ids=["sync_index_settings", "add_documents", "remove_documents"],
+    )
+    def test_default_retry_delay_is_sixty_seconds(self, task):
+        """Each retrying task is decorated with ``default_retry_delay=60``."""
+        assert task.default_retry_delay == 60
