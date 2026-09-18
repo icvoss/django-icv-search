@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from unittest.mock import patch
+
 import pytest
 
 from icv_search.backends import reset_search_backend
@@ -89,6 +91,15 @@ class TestDeleteDocument:
         result = delete_document("products", "nonexistent")
         assert isinstance(result, TaskResult)
 
+    @pytest.mark.django_db
+    def test_delegates_to_remove_documents(self, products_index):
+        """delete_document is remove_documents with a single-element list (BR-011 / #53)."""
+        with patch("icv_search.services.documents.remove_documents") as mock_remove:
+            mock_remove.return_value = TaskResult(task_uid="t1", status="enqueued")
+            delete_document("products", "1")
+
+        mock_remove.assert_called_once_with("products", ["1"], "")
+
 
 class TestDeleteDocumentExport:
     """delete_document is correctly exported."""
@@ -128,7 +139,7 @@ class TestDeleteDocumentsByFilterFallback:
 
     @pytest.mark.django_db
     def test_filter_delete_removes_matching_docs(self, products_index):
-        # Dummy backend has no native filter-delete — exercises the fallback.
+        # Dummy backend has no native filter-delete: exercises the fallback.
         result = delete_documents_by_filter(products_index, {"title": "Tennis Racket"})
         assert isinstance(result, TaskResult)
 

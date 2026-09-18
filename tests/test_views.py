@@ -7,6 +7,7 @@ never be taken from client-supplied JSON.
 from __future__ import annotations
 
 import json
+import sys
 from unittest.mock import patch
 
 import pytest
@@ -27,6 +28,22 @@ def _post_click(rf, body: dict, content_type: str = "application/json"):
         content_type=content_type,
     )
     return icv_search_click(request)
+
+
+def _metadata_at_sizeof(target: int) -> dict:
+    """Build metadata whose ``sys.getsizeof(str(...))`` equals ``target``.
+
+    The click endpoint measures metadata with ``sys.getsizeof``, not UTF-8
+    length (#55). A JSON round-trip must preserve that size.
+    """
+    for length in range(max(0, target - 100), target + 100):
+        candidate = {"payload": "x" * length}
+        if sys.getsizeof(str(candidate)) == target:
+            # Mirror the view's json.loads path so the measured object matches.
+            round_tripped = json.loads(json.dumps(candidate))
+            if sys.getsizeof(str(round_tripped)) == target:
+                return round_tripped
+    raise AssertionError(f"could not build metadata with sizeof {target}")
 
 
 class TestIcvSearchClickTenantAttribution:
@@ -139,3 +156,77 @@ class TestIcvSearchClickBasics:
             )
 
         assert response.status_code == 204
+
+
+class TestIcvSearchClickValidationBoundaries:
+    """Field length and metadata sizeof boundaries on the click endpoint (#55)."""
+
+    @pytest.mark.parametrize("field_name", ("index_name", "query", "document_id"))
+    def test_field_at_max_length_is_accepted(self, rf, settings, field_name):
+        settings.ICV_SEARCH_CLICK_TRACKING = True
+        body = {
+            "index_name": "products",
+            "query": "shoes",
+            "document_id": "42",
+            "position": 0,
+        }
+        body[field_name] = "a" * 500
+
+        with patch("icv_search.services.click_tracking.log_click"):
+            response = _post_click(rf, body)
+
+        assert response.status_code == 204
+
+    @pytest.mark.parametrize("field_name", ("index_name", "query", "document_id"))
+    def test_field_over_max_length_returns_400(self, rf, settings, field_name):
+        settings.ICV_SEARCH_CLICK_TRACKING = True
+        body = {
+            "index_name": "products",
+            "query": "shoes",
+            "document_id": "42",
+            "position": 0,
+        }
+        body[field_name] = "a" * 501
+
+        response = _post_click(rf, body)
+
+        assert response.status_code == 400
+
+    def test_metadata_at_max_sizeof_is_accepted(self, rf, settings):
+        settings.ICV_SEARCH_CLICK_TRACKING = True
+        metadata = _metadata_at_sizeof(10240)
+        assert sys.getsizeof(str(metadata)) == 10240
+
+        with patch("icv_search.services.click_tracking.log_click"):
+            response = _post_click(
+                rf,
+                {
+                    "index_name": "products",
+                    "query": "shoes",
+                    "document_id": "42",
+                    "position": 0,
+                    "metadata": metadata,
+                },
+            )
+
+        assert response.status_code == 204
+
+    def test_metadata_over_max_sizeof_returns_400(self, rf, settings):
+        settings.ICV_SEARCH_CLICK_TRACKING = True
+        metadata = _metadata_at_sizeof(10241)
+        assert sys.getsizeof(str(metadata)) == 10241
+        # UTF-8 length of the JSON body value is not the gate the view uses.
+        assert len(json.dumps(metadata).encode("utf-8")) != 10241
+
+        response = _post_click(
+            rf,
+            {
+                "index_name": "products",
+                "query": "shoes",
+                "document_id": "42",
+                "position": 0,
+                "metadata": metadata,
+            },
+        )
+
+        assert response.status_code == 400
