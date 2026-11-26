@@ -4,6 +4,28 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [1.6.1] - 2026-11-26
+
+### Added
+
+- **`icv_search.W001` system check** (ADR-101 decision 3, umbrella
+  icvoss/icv-oss-umbrella#678). Warns at `manage.py check`, `runserver` and
+  deploy when no logging handler is reachable from the `icv_search` logger
+  (a handler on the logger itself, or on an ancestor while `propagate` stays
+  true; `logging.lastResort` does not count). Without one, the failures this
+  package logs (index create/delete/settings-sync exceptions, document
+  index/remove failures in auto-indexing, the query-logging exception) are
+  invisible.
+
+### Upgrade note
+
+- **New warning on upgrade.** A project whose `LOGGING` configures no handler
+  for `icv_search` or the root logger will now see `icv_search.W001` from
+  `manage.py check`. It is a Warning, not an Error, so boot is unaffected;
+  add a handler for `icv_search` (or the root logger) to clear it, or list it
+  in `SILENCED_SYSTEM_CHECKS`. A project that runs
+  `check --fail-level WARNING` will fail until one of those is done.
+
 ## [1.6.0] - 2026-09-18
 
 ### Fixed

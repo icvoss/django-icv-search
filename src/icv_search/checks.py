@@ -10,14 +10,27 @@ be a swappable concrete model. A misconfigured ICV_BASE_MODEL (pointing
 at a concrete model, a non-model class, or something that fails to import
 at all) must fail loudly at ``manage.py check`` time, not deep inside the
 ORM the first time a search model is defined.
+icv_search.W001: no logging handler reaches the package's own logger
+hierarchy (ADR-101 decision 3). Every icv_search module logs via
+``logging.getLogger(__name__)`` under the ``icv_search`` hierarchy; if a
+consuming project's LOGGING configuration attaches no handler anywhere in
+that chain, the failures this package logs (e.g. ``services.indexing``'s
+"Failed to create search index" / "Failed to sync settings" exceptions,
+``auto_index``'s "Failed to index document" / "Failed to remove document"
+paths, and ``middleware``'s query-logging exception) are effectively
+invisible.
 """
 
 from __future__ import annotations
 
-from django.core.checks import Error, Tags, register
+import logging
+
+from django.core.checks import Error, Tags, Warning, register
 from django.utils.module_loading import import_string
 
 E005_ID = "icv_search.E005"
+W001_ID = "icv_search.W001"
+_PACKAGE_LOGGER_NAME = "icv_search"
 
 
 def _base_model_not_abstract_error() -> Error | None:
@@ -127,4 +140,61 @@ def check_icv_search_configuration(app_configs, **kwargs):
     return errors
 
 
-__all__ = ["check_base_model_is_abstract", "check_icv_search_configuration"]
+def _has_reachable_handler(logger_name: str) -> bool:
+    """Return whether a handler is attached anywhere in ``logger_name``'s
+    hierarchy that a record from it would actually reach, walking ancestors
+    while ``propagate`` is true. ``logging.lastResort`` (the module-level
+    fallback that stderr-prints WARNING+ when nothing else is configured) is
+    not a configured handler and is ignored, per ADR-101 decision 3: it
+    exists precisely to be invisible/unmanaged, not a substitute for a real
+    handler the consumer chose.
+    """
+    logger = logging.getLogger(logger_name)
+
+    current: logging.Logger | None = logger
+    while current is not None:
+        if any(handler is not logging.lastResort for handler in current.handlers):
+            return True
+        if not current.propagate:
+            return False
+        current = current.parent
+
+    return False
+
+
+@register()
+def check_logging_handler_configured(app_configs, **kwargs):  # type: ignore[no-untyped-def]
+    """Warn when no handler reaches the icv_search logger hierarchy (icv_search.W001).
+
+    ADR-101 decision 3: a package that emits through logging ships a
+    boot-time check confirming the consumer's LOGGING configuration
+    actually routes it somewhere. icv-search's failure-logging call sites
+    (index create/delete/settings-sync exceptions in ``services.indexing``,
+    document index/remove failures in ``auto_index``, and the query-logging
+    exception in ``services.search``) rely on this.
+    """
+    if _has_reachable_handler(_PACKAGE_LOGGER_NAME):
+        return []
+
+    return [
+        Warning(
+            "No logging handler is configured to receive records from the "
+            f"'{_PACKAGE_LOGGER_NAME}' logger (or any of its ancestors while "
+            "propagate=True), so failures icv-search logs (e.g. 'Failed to "
+            "create search index', 'Failed to index document') will be invisible.",
+            hint=(
+                "Add a handler for the 'icv_search' logger (or the root logger, "
+                "if it propagates) in your LOGGING setting, e.g. "
+                "LOGGING['loggers']['icv_search'] = {'handlers': [...], "
+                "'level': 'WARNING', 'propagate': True}."
+            ),
+            id=W001_ID,
+        )
+    ]
+
+
+__all__ = [
+    "check_base_model_is_abstract",
+    "check_icv_search_configuration",
+    "check_logging_handler_configured",
+]
