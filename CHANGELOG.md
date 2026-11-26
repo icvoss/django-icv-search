@@ -4,6 +4,31 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [1.6.2] - 2026-11-26
+
+### Changed
+
+- **The logging-handler boot check is now an Error: `icv_search.E006` replaces
+  `icv_search.W001`** (ADR-101 decision 3, `docs/STANDARDS.md` section 15,
+  umbrella icvoss/icv-oss-umbrella#678). ADR-101 and STANDARDS require this
+  check to fail as `django.core.checks.Error`, not `Warning`; the previous
+  release shipped it as a Warning in error. `manage.py check`,
+  `check --deploy` and `runserver` now fail when no handler is reachable from
+  the `icv_search` logger (a handler on the logger itself, or on an ancestor while
+  `propagate` stays true; `logging.lastResort` does not count). The detection
+  logic is unchanged. The retired `icv_search.W001` id is not reused.
+
+### On upgrade
+
+- **Behaviour change: `manage.py check` and `check --deploy` now error.** A
+  project whose `LOGGING` configures no handler for `icv_search` or the root logger
+  previously saw the Warning `icv_search.W001`; it now sees the Error
+  `icv_search.E006` and the check run exits non-zero. Add a handler for `icv_search`
+  (or the root logger) in `LOGGING`, e.g. `LOGGING["loggers"]["icv_search"] =
+  {"handlers": [...], "level": "WARNING", "propagate": True}`. If you have
+  silenced the old id in `SILENCED_SYSTEM_CHECKS`, replace `icv_search.W001` with
+  `icv_search.E006`.
+
 ## [1.6.1] - 2026-11-26
 
 ### Added

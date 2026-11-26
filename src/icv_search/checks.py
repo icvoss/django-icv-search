@@ -10,7 +10,7 @@ be a swappable concrete model. A misconfigured ICV_BASE_MODEL (pointing
 at a concrete model, a non-model class, or something that fails to import
 at all) must fail loudly at ``manage.py check`` time, not deep inside the
 ORM the first time a search model is defined.
-icv_search.W001: no logging handler reaches the package's own logger
+icv_search.E006: no logging handler reaches the package's own logger
 hierarchy (ADR-101 decision 3). Every icv_search module logs via
 ``logging.getLogger(__name__)`` under the ``icv_search`` hierarchy; if a
 consuming project's LOGGING configuration attaches no handler anywhere in
@@ -18,18 +18,18 @@ that chain, the failures this package logs (e.g. ``services.indexing``'s
 "Failed to create search index" / "Failed to sync settings" exceptions,
 ``auto_index``'s "Failed to index document" / "Failed to remove document"
 paths, and ``middleware``'s query-logging exception) are effectively
-invisible.
+invisible. It is an Error per ADR-101 decision 3 and docs/STANDARDS.md section 15; it shipped as the Warning icv_search.W001, an id now retired and not reused.
 """
 
 from __future__ import annotations
 
 import logging
 
-from django.core.checks import Error, Tags, Warning, register
+from django.core.checks import Error, Tags, register
 from django.utils.module_loading import import_string
 
 E005_ID = "icv_search.E005"
-W001_ID = "icv_search.W001"
+E006_ID = "icv_search.E006"
 _PACKAGE_LOGGER_NAME = "icv_search"
 
 
@@ -164,7 +164,7 @@ def _has_reachable_handler(logger_name: str) -> bool:
 
 @register()
 def check_logging_handler_configured(app_configs, **kwargs):  # type: ignore[no-untyped-def]
-    """Warn when no handler reaches the icv_search logger hierarchy (icv_search.W001).
+    """Fail with an Error when no handler reaches the icv_search logger hierarchy (icv_search.E006).
 
     ADR-101 decision 3: a package that emits through logging ships a
     boot-time check confirming the consumer's LOGGING configuration
@@ -177,7 +177,7 @@ def check_logging_handler_configured(app_configs, **kwargs):  # type: ignore[no-
         return []
 
     return [
-        Warning(
+        Error(
             "No logging handler is configured to receive records from the "
             f"'{_PACKAGE_LOGGER_NAME}' logger (or any of its ancestors while "
             "propagate=True), so failures icv-search logs (e.g. 'Failed to "
@@ -188,7 +188,7 @@ def check_logging_handler_configured(app_configs, **kwargs):  # type: ignore[no-
                 "LOGGING['loggers']['icv_search'] = {'handlers': [...], "
                 "'level': 'WARNING', 'propagate': True}."
             ),
-            id=W001_ID,
+            id=E006_ID,
         )
     ]
 
